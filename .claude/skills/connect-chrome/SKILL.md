@@ -1,0 +1,1 @@
+/Users/hung/conductor/repos/pack23/.claude/skills/gstack/connect-chrome/SKILL.md
