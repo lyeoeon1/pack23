@@ -214,6 +214,8 @@
   <div class="sub">Trong cay, tuoi nuoc, xay khu vuon cua rieng ban!</div>
   <button id="start-btn">&#127793; BAT DAU TRONG VUON</button>
   <div id="loading-text" class="loading-dots">Dang tai AI</div>
+  <button class="hidden" id="gardenRetry" style="margin-top:16px;padding:12px 32px;border:none;border-radius:999px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-family:'Fredoka',sans-serif;font-size:16px;font-weight:600;cursor:pointer;">Thu lai</button>
+  <a href="../index.html" class="hidden" id="gardenBack" style="display:block;margin-top:10px;color:rgba(255,255,255,0.5);font-size:13px;text-decoration:underline;">Ve trang chu</a>
 </div>
 
 <!-- Win Overlay -->
@@ -935,20 +937,51 @@ function getTargetForRound() {
   return lvl.min + Math.floor(Math.random() * (lvl.max - lvl.min + 1));
 }
 
+const gardenRetry = document.getElementById('gardenRetry');
+const gardenBack = document.getElementById('gardenBack');
+
+function showGardenError(msg) {
+  loadingText.textContent = msg;
+  loadingText.classList.add('visible');
+  gardenRetry.classList.remove('hidden');
+  gardenBack.classList.remove('hidden');
+  gardenBack.style.display = 'block';
+}
+
+gardenRetry.onclick = () => {
+  gardenRetry.classList.add('hidden');
+  gardenBack.classList.add('hidden');
+  startGame();
+};
+
 async function startGame() {
   startBtn.disabled = true;
+  loadingText.textContent = 'Buoc 1/2: Tai AI...';
   loadingText.classList.add('visible');
+  gardenRetry.classList.add('hidden');
+  gardenBack.classList.add('hidden');
 
   try {
-    await Promise.all([
-      vision.initObjectDetection({ scoreThreshold: 0.25, maxResults: 20 }),
-      vision.initHandTracking({ numHands: 2 }),
+    const initTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Tai qua lau — vui long kiem tra mang va thu lai.')), 30000));
+    await Promise.race([
+      Promise.all([
+        vision.initObjectDetection({ scoreThreshold: 0.25, maxResults: 20 }),
+        vision.initHandTracking({ numHands: 2 }),
+      ]),
+      initTimeout,
     ]);
-    await vision.startCamera();
+
+    loadingText.textContent = 'Buoc 2/2: Bat camera...';
+    const ok = await vision.startCamera();
+    if (!ok) {
+      showGardenError('Khong the bat camera. Vui long cho phep truy cap camera va thu lai!');
+      startBtn.disabled = false;
+      return;
+    }
   } catch (e) {
-    loadingText.textContent = 'Khong the tai AI hoac bat camera. Hay thu lai!';
-    startBtn.disabled = false;
     console.error(e);
+    showGardenError('Loi: ' + (e.message || e));
+    startBtn.disabled = false;
     return;
   }
 

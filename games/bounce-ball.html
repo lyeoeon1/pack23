@@ -1,0 +1,1554 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tuong Nay Bong Ro - KidZone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      font-family: 'Fredoka', system-ui, sans-serif;
+      background: #0f0520;
+    }
+
+    /* ---------- layer stack ---------- */
+    #gameCanvas {
+      position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0;
+    }
+    #threeCanvas {
+      position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1;
+      pointer-events: none;
+    }
+    #uiLayer {
+      position: fixed; inset: 0; z-index: 4;
+      pointer-events: none;
+    }
+    #uiLayer > * { pointer-events: auto; }
+
+    /* ---------- back button ---------- */
+    .back-btn {
+      position: fixed; top: 16px; left: 16px; z-index: 10;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 20px; border-radius: 999px;
+      background: rgba(0,0,0,0.45); backdrop-filter: blur(8px);
+      color: #fff; font-family: 'Fredoka', sans-serif;
+      font-size: 16px; font-weight: 600;
+      text-decoration: none; border: 2px solid rgba(255,255,255,0.15);
+      transition: all 0.2s;
+    }
+    .back-btn:hover { background: rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.3); }
+
+    /* ---------- game HUD (top center) ---------- */
+    .game-hud {
+      position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
+      display: flex; gap: 14px; align-items: center;
+      padding: 10px 24px; border-radius: 20px;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(10px);
+      border: 2px solid rgba(255,255,255,0.12);
+      opacity: 0; transition: opacity 0.4s;
+    }
+    .game-hud.show { opacity: 1; }
+    .hud-item {
+      display: flex; align-items: center; gap: 6px;
+      color: #fff; font-size: 16px; font-weight: 600;
+      white-space: nowrap;
+    }
+    .hud-item .hud-icon { font-size: 20px; }
+    .hud-item .hud-val { color: #fbbf24; font-weight: 700; font-size: 20px; min-width: 24px; text-align: center; }
+    .hud-divider { width: 1px; height: 24px; background: rgba(255,255,255,0.15); }
+    .hud-timer { color: #4ade80; }
+    .hud-timer.warning { color: #fb7185; animation: timerPulse 0.5s ease infinite alternate; }
+    @keyframes timerPulse { 0%{opacity:1;} 100%{opacity:0.5;} }
+
+    /* ---------- level badge (top right) ---------- */
+    .level-badge {
+      position: fixed; top: 16px; right: 16px; z-index: 10;
+      padding: 10px 20px; border-radius: 999px;
+      background: rgba(0,0,0,0.45); backdrop-filter: blur(8px);
+      color: #fbbf24; font-family: 'Fredoka', sans-serif;
+      font-size: 18px; font-weight: 700;
+      border: 2px solid rgba(251,191,36,0.3);
+      opacity: 0; transition: opacity 0.4s;
+    }
+    .level-badge.show { opacity: 1; }
+
+    /* ---------- HUD controls panel (left side) ---------- */
+    .controls-panel {
+      position: fixed; top: 72px; left: 16px; z-index: 10;
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 16px; border-radius: 20px;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(10px);
+      border: 2px solid rgba(255,255,255,0.1);
+      max-width: 240px; opacity: 0; transition: opacity 0.4s;
+    }
+    .controls-panel.show { opacity: 1; }
+    .ctrl-row {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .ctrl-label {
+      color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 500;
+      min-width: 70px;
+    }
+    .ctrl-select, .ctrl-range {
+      flex: 1; min-width: 0;
+    }
+    .ctrl-select {
+      background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px; padding: 5px 8px; font-family: 'Fredoka', sans-serif; font-size: 12px;
+      outline: none; cursor: pointer;
+    }
+    .ctrl-select option { background: #1a0a3e; color: #fff; }
+    .ctrl-range {
+      -webkit-appearance: none; appearance: none;
+      height: 6px; border-radius: 3px;
+      background: rgba(255,255,255,0.15); outline: none;
+    }
+    .ctrl-range::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+      background: #fbbf24; cursor: pointer; border: 2px solid rgba(0,0,0,0.3);
+    }
+    .ctrl-btn {
+      padding: 6px 14px; border-radius: 12px; border: none; cursor: pointer;
+      font-family: 'Fredoka', sans-serif; font-size: 12px; font-weight: 600;
+      color: #fff; transition: all 0.2s;
+    }
+    .ctrl-btn.primary { background: linear-gradient(135deg, #f97316, #ec4899); }
+    .ctrl-btn.primary:hover { transform: scale(1.05); }
+    .ctrl-btn.secondary { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.15); }
+    .ctrl-btn.secondary:hover { background: rgba(255,255,255,0.2); }
+    .ctrl-btn.active { background: linear-gradient(135deg, #4ade80, #22d3ee); }
+    .ctrl-btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .color-chip {
+      width: 24px; height: 24px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.2);
+      cursor: pointer; transition: all 0.2s;
+    }
+    .color-chip:hover, .color-chip.active { border-color: #fff; transform: scale(1.15); }
+
+    /* ---------- camera preview (bottom right) ---------- */
+    .camera-preview {
+      position: fixed; bottom: 16px; right: 16px; z-index: 10;
+      display: none; gap: 4px; border-radius: 16px; overflow: hidden;
+      border: 3px solid rgba(255,255,255,0.2);
+      background: #111; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .camera-preview.show { display: flex; }
+    .cam-box {
+      width: 160px; height: 120px; position: relative; overflow: hidden;
+    }
+    .cam-box video, .cam-box canvas {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .cam-box video { transform: scaleX(-1); }
+    .cam-label {
+      position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.7); color: rgba(255,255,255,0.7); font-size: 10px;
+      font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap;
+    }
+
+    /* ---------- start screen ---------- */
+    .overlay-screen {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, rgba(15,5,32,0.92), rgba(26,10,62,0.95));
+      transition: opacity 0.5s;
+    }
+    .overlay-screen.hidden { opacity: 0; pointer-events: none; }
+    .start-deco {
+      font-size: 64px; margin-bottom: 16px;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+    .overlay-screen h1 {
+      font-size: clamp(40px, 8vw, 80px); font-weight: 700;
+      background: linear-gradient(135deg, #fbbf24 0%, #f97316 30%, #ec4899 60%, #818cf8 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 8px; text-align: center; padding: 0 16px;
+    }
+    .overlay-screen .sub {
+      color: rgba(255,255,255,0.6); font-size: clamp(16px, 2.5vw, 22px);
+      margin-bottom: 40px; text-align: center; padding: 0 24px; max-width: 600px;
+    }
+    .start-btn {
+      padding: 18px 56px; border-radius: 999px; border: none; cursor: pointer;
+      font-family: 'Fredoka', sans-serif; font-size: clamp(22px, 4vw, 32px); font-weight: 700;
+      color: #fff; background: linear-gradient(135deg, #f97316, #ec4899);
+      box-shadow: 0 8px 32px rgba(249,115,22,0.4);
+      transition: all 0.2s; position: relative; overflow: hidden;
+    }
+    .start-btn:hover { transform: scale(1.05); box-shadow: 0 12px 40px rgba(249,115,22,0.5); }
+    .start-btn:active { transform: scale(0.97); }
+
+    /* ---------- loading ---------- */
+    .loading-screen {
+      position: fixed; inset: 0; z-index: 25;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(15,5,32,0.95);
+      transition: opacity 0.5s;
+    }
+    .loading-screen.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 56px; height: 56px; border-radius: 50%;
+      border: 5px solid rgba(255,255,255,0.15);
+      border-top-color: #fbbf24;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 24px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text {
+      color: rgba(255,255,255,0.7); font-size: 20px; font-weight: 600;
+    }
+
+    /* ---------- level intro overlay ---------- */
+    .level-intro {
+      position: fixed; inset: 0; z-index: 18;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(15,5,32,0.85); backdrop-filter: blur(6px);
+      opacity: 0; pointer-events: none; transition: opacity 0.4s;
+    }
+    .level-intro.show { opacity: 1; pointer-events: auto; }
+    .level-intro h2 {
+      font-size: clamp(36px, 7vw, 64px); font-weight: 700;
+      color: #fbbf24; text-shadow: 0 4px 20px rgba(251,191,36,0.4);
+      margin-bottom: 8px;
+    }
+    .level-intro .level-desc {
+      color: rgba(255,255,255,0.7); font-size: clamp(16px, 2.5vw, 24px);
+      margin-bottom: 12px; text-align: center; padding: 0 24px;
+    }
+    .level-intro .level-target {
+      color: #4ade80; font-size: clamp(18px, 3vw, 28px); font-weight: 600;
+      margin-bottom: 32px;
+    }
+    .level-intro-btn {
+      padding: 14px 40px; border-radius: 999px; border: none; cursor: pointer;
+      font-family: 'Fredoka', sans-serif; font-size: 20px; font-weight: 700;
+      color: #fff; background: linear-gradient(135deg, #f97316, #ec4899);
+      box-shadow: 0 6px 24px rgba(249,115,22,0.35);
+      transition: all 0.2s;
+    }
+    .level-intro-btn:hover { transform: scale(1.05); }
+
+    /* ---------- win screen ---------- */
+    .win-screen {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, rgba(15,5,32,0.93), rgba(26,10,62,0.96));
+      opacity: 0; pointer-events: none; transition: opacity 0.6s;
+    }
+    .win-screen.show { opacity: 1; pointer-events: auto; }
+    .win-title {
+      font-size: clamp(48px, 10vw, 90px); font-weight: 700;
+      background: linear-gradient(135deg, #fbbf24, #f97316, #ec4899);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 16px;
+    }
+    .win-stars { font-size: clamp(32px, 6vw, 56px); margin-bottom: 32px; }
+    .win-stats {
+      color: rgba(255,255,255,0.7); font-size: clamp(16px, 2.5vw, 22px);
+      margin-bottom: 40px; text-align: center; line-height: 2;
+    }
+    .replay-btn {
+      padding: 16px 48px; border-radius: 999px; border: none; cursor: pointer;
+      font-family: 'Fredoka', sans-serif; font-size: 22px; font-weight: 700;
+      color: #fff; background: linear-gradient(135deg, #4ade80, #22d3ee);
+      box-shadow: 0 8px 28px rgba(74,222,128,0.35);
+      transition: all 0.2s;
+    }
+    .replay-btn:hover { transform: scale(1.05); }
+
+    /* ---------- lose screen ---------- */
+    .lose-screen {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, rgba(15,5,32,0.93), rgba(26,10,62,0.96));
+      opacity: 0; pointer-events: none; transition: opacity 0.6s;
+    }
+    .lose-screen.show { opacity: 1; pointer-events: auto; }
+    .lose-title {
+      font-size: clamp(36px, 8vw, 72px); font-weight: 700;
+      color: #fb7185; text-shadow: 0 4px 20px rgba(251,113,133,0.3);
+      margin-bottom: 8px;
+    }
+    .lose-sub {
+      color: rgba(255,255,255,0.6); font-size: clamp(16px, 2.5vw, 22px);
+      margin-bottom: 32px; text-align: center;
+    }
+
+    /* ---------- floating text ---------- */
+    .float-text {
+      position: fixed; z-index: 12; pointer-events: none;
+      font-family: 'Fredoka', sans-serif; font-weight: 700;
+      font-size: 28px; text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+      animation: floatUp 1.2s ease-out forwards;
+    }
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-80px) scale(1.3); }
+    }
+
+    /* ---------- projection mode ---------- */
+    body.projection .back-btn,
+    body.projection .game-hud,
+    body.projection .level-badge,
+    body.projection .controls-panel,
+    body.projection .camera-preview { opacity: 0 !important; pointer-events: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Main game canvas (2D) -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Three.js overlay for celebrations -->
+  <canvas id="threeCanvas"></canvas>
+
+  <!-- Hidden video for camera -->
+  <video id="cameraVideo" autoplay playsinline muted style="display:none;"></video>
+  <!-- Hidden canvas for color detection -->
+  <canvas id="detectCanvas" style="display:none;"></canvas>
+
+  <!-- UI layer -->
+  <div id="uiLayer">
+    <a class="back-btn" id="backBtn" href="../index.html">&#8592; Ve trang chu</a>
+
+    <div class="level-badge" id="levelBadge">Man 1</div>
+
+    <div class="game-hud" id="gameHud">
+      <div class="hud-item">
+        <span class="hud-icon">&#127936;</span>
+        <span class="hud-val" id="hudScore">0</span>
+        <span>/ <span id="hudTarget">5</span></span>
+      </div>
+      <div class="hud-divider"></div>
+      <div class="hud-item">
+        <span class="hud-icon">&#9200;</span>
+        <span class="hud-val hud-timer" id="hudTimer">60</span>
+      </div>
+      <div class="hud-divider"></div>
+      <div class="hud-item">
+        <span class="hud-icon">&#127758;</span>
+        <span id="hudWalls">0</span> tuong
+      </div>
+    </div>
+
+    <!-- Controls panel -->
+    <div class="controls-panel" id="controlsPanel">
+      <div class="ctrl-row">
+        <span class="ctrl-label">Man choi</span>
+        <select class="ctrl-select" id="ctrlLevel">
+          <option value="0">Man 1 - De</option>
+          <option value="1">Man 2 - Trung binh</option>
+          <option value="2">Man 3 - Kho</option>
+        </select>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Mau sac</span>
+        <div style="display:flex;gap:6px;">
+          <div class="color-chip active" data-color="yellow" style="background:#fbbf24;" title="Vang"></div>
+          <div class="color-chip" data-color="pink" style="background:#ec4899;" title="Hong"></div>
+          <div class="color-chip" data-color="green" style="background:#4ade80;" title="Xanh la"></div>
+          <div class="color-chip" data-color="blue" style="background:#60a5fa;" title="Xanh duong"></div>
+        </div>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Do nhay</span>
+        <input class="ctrl-range" id="ctrlSensitivity" type="range" min="10" max="60" value="30">
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Kich thuoc</span>
+        <input class="ctrl-range" id="ctrlMinSize" type="range" min="200" max="5000" value="800">
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Toi da tuong</span>
+        <input class="ctrl-range" id="ctrlMaxObjects" type="range" min="1" max="10" value="5">
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Toc do bong</span>
+        <input class="ctrl-range" id="ctrlSpawnSpeed" type="range" min="500" max="4000" value="1800">
+      </div>
+      <div class="ctrl-btn-row">
+        <button class="ctrl-btn secondary" id="ctrlFreeze" title="Dong bang tuong (F)">&#10052; Dong bang</button>
+        <button class="ctrl-btn secondary" id="ctrlProjection" title="Che do chieu (P)">&#128250; Chieu</button>
+      </div>
+    </div>
+
+    <!-- Camera preview -->
+    <div class="camera-preview" id="cameraPreview">
+      <div class="cam-box">
+        <video id="camPreviewVideo" autoplay playsinline muted></video>
+        <div class="cam-label">Camera</div>
+      </div>
+      <div class="cam-box">
+        <canvas id="camMaskCanvas"></canvas>
+        <div class="cam-label">Nhan dien</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Start screen -->
+  <div class="overlay-screen" id="startScreen">
+    <div class="start-deco">&#127936;</div>
+    <h1>Tuong Nay Bong Ro</h1>
+    <div class="sub">Dat vat mau truoc camera de tao tuong nay, dan bong vao ro!</div>
+    <button class="start-btn" id="startBtn">BAT DAU</button>
+  </div>
+
+  <!-- Loading screen -->
+  <div class="loading-screen hidden" id="loadingScreen">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">Dang bat camera...</div>
+  </div>
+
+  <!-- Level intro -->
+  <div class="level-intro" id="levelIntro">
+    <h2 id="levelIntroTitle">Man 1 — De</h2>
+    <div class="level-desc" id="levelIntroDesc">Ro lon, bong cham — khoi dau nhe nhang!</div>
+    <div class="level-target" id="levelIntroTarget">Muc tieu: 5 bong trong 60 giay</div>
+    <button class="level-intro-btn" id="levelIntroBtn">Choi!</button>
+  </div>
+
+  <!-- Win screen -->
+  <div class="win-screen" id="winScreen">
+    <div class="win-title">Gioi qua!</div>
+    <div class="win-stars" id="winStars"></div>
+    <div class="win-stats" id="winStats"></div>
+    <button class="replay-btn" id="replayBtn">Choi lai</button>
+  </div>
+
+  <!-- Lose screen -->
+  <div class="lose-screen" id="loseScreen">
+    <div class="lose-title">Het gio!</div>
+    <div class="lose-sub" id="loseSub">Ban dat duoc 3/5 bong. Thu lai nhe!</div>
+    <button class="replay-btn" id="retryBtn">Thu lai</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { AudioSynthesizer } from '../engine/audio.js';
+
+    // =====================================================
+    //  CONSTANTS & CONFIG
+    // =====================================================
+    const LEVELS = [
+      { name: 'Man 1 — De',    desc: 'Ro lon, bong cham — khoi dau nhe nhang!', target: 5,  time: 60, gravity: 0.18, basketW: 0.13, basketH: 0.10, ballSpeed: 3.0, spawnMs: 2200 },
+      { name: 'Man 2 — Trung binh', desc: 'Ro nho hon, bong nhanh hon!',         target: 10, time: 75, gravity: 0.22, basketW: 0.10, basketH: 0.08, ballSpeed: 4.0, spawnMs: 1600 },
+      { name: 'Man 3 — Kho',   desc: 'Ro be xiu, bong sieu nhanh!',              target: 16, time: 90, gravity: 0.28, basketW: 0.07, basketH: 0.06, ballSpeed: 5.0, spawnMs: 1200 },
+    ];
+
+    const COLOR_PRESETS = {
+      yellow: { hue: 55, range: 30, sat: 0.25, val: 0.35, css: '#fbbf24', glow: 'rgba(251,191,36,' },
+      pink:   { hue: 325, range: 30, sat: 0.20, val: 0.30, css: '#ec4899', glow: 'rgba(236,72,153,' },
+      green:  { hue: 125, range: 35, sat: 0.20, val: 0.25, css: '#4ade80', glow: 'rgba(74,222,128,' },
+      blue:   { hue: 215, range: 30, sat: 0.20, val: 0.30, css: '#60a5fa', glow: 'rgba(96,165,250,' },
+    };
+
+    const BALL_RADIUS = 10;
+    const BALL_TRAIL_LEN = 8;
+    const BALL_MAX = 12;
+    const ENERGY_LOSS = 0.72;
+    const WALL_SMOOTHING = 0.4;
+
+    // =====================================================
+    //  STATE
+    // =====================================================
+    let state = {
+      phase: 'start', // start | loading | levelIntro | playing | paused | win | lose
+      level: 0,
+      score: 0,
+      timeLeft: 60,
+      timerInterval: null,
+      balls: [],
+      walls: [],         // detected walls [{x,y,w,h}] in canvas coords
+      frozenWalls: null,  // if frozen, snapshot of walls
+      frozen: false,
+      projection: false,
+      selectedColor: 'yellow',
+      sensitivity: 30,
+      minSize: 800,
+      maxObjects: 5,
+      spawnSpeed: 1800,
+      lastSpawn: 0,
+      floatingTexts: [],
+      particles: [],
+      cameraReady: false,
+    };
+
+    // =====================================================
+    //  AUDIO
+    // =====================================================
+    const audio = new AudioSynthesizer();
+
+    // =====================================================
+    //  DOM REFS
+    // =====================================================
+    const gameCanvas = document.getElementById('gameCanvas');
+    const gc = gameCanvas.getContext('2d');
+    const threeCanvasEl = document.getElementById('threeCanvas');
+    const cameraVideo = document.getElementById('cameraVideo');
+    const detectCanvas = document.getElementById('detectCanvas');
+    const detectCtx = detectCanvas.getContext('2d', { willReadFrequently: true });
+    const camPreviewVideo = document.getElementById('camPreviewVideo');
+    const camMaskCanvas = document.getElementById('camMaskCanvas');
+    const camMaskCtx = camMaskCanvas.getContext('2d');
+
+    const startScreen = document.getElementById('startScreen');
+    const startBtn = document.getElementById('startBtn');
+    const loadingScreen = document.getElementById('loadingScreen');
+    const loadingText = document.getElementById('loadingText');
+    const levelIntro = document.getElementById('levelIntro');
+    const levelIntroTitle = document.getElementById('levelIntroTitle');
+    const levelIntroDesc = document.getElementById('levelIntroDesc');
+    const levelIntroTarget = document.getElementById('levelIntroTarget');
+    const levelIntroBtn = document.getElementById('levelIntroBtn');
+    const gameHud = document.getElementById('gameHud');
+    const levelBadge = document.getElementById('levelBadge');
+    const controlsPanel = document.getElementById('controlsPanel');
+    const cameraPreview = document.getElementById('cameraPreview');
+    const hudScore = document.getElementById('hudScore');
+    const hudTarget = document.getElementById('hudTarget');
+    const hudTimer = document.getElementById('hudTimer');
+    const hudWalls = document.getElementById('hudWalls');
+    const winScreen = document.getElementById('winScreen');
+    const winStars = document.getElementById('winStars');
+    const winStats = document.getElementById('winStats');
+    const replayBtn = document.getElementById('replayBtn');
+    const loseScreen = document.getElementById('loseScreen');
+    const loseSub = document.getElementById('loseSub');
+    const retryBtn = document.getElementById('retryBtn');
+    const ctrlLevel = document.getElementById('ctrlLevel');
+    const ctrlSensitivity = document.getElementById('ctrlSensitivity');
+    const ctrlMinSize = document.getElementById('ctrlMinSize');
+    const ctrlMaxObjects = document.getElementById('ctrlMaxObjects');
+    const ctrlSpawnSpeed = document.getElementById('ctrlSpawnSpeed');
+    const ctrlFreeze = document.getElementById('ctrlFreeze');
+    const ctrlProjection = document.getElementById('ctrlProjection');
+
+    // =====================================================
+    //  THREE.JS SETUP (celebrations only)
+    // =====================================================
+    let threeScene, threeCamera, threeRenderer;
+    let confettiParticles = [];
+
+    function initThree() {
+      threeScene = new THREE.Scene();
+      threeCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+      threeCamera.position.z = 5;
+      threeRenderer = new THREE.WebGLRenderer({ canvas: threeCanvasEl, alpha: true, antialias: true });
+      threeRenderer.setSize(window.innerWidth, window.innerHeight);
+      threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      threeRenderer.setClearColor(0x000000, 0);
+      const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+      threeScene.add(ambient);
+      const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+      dir.position.set(2, 3, 5);
+      threeScene.add(dir);
+    }
+
+    const CONFETTI_COLORS = [0xfbbf24, 0xf97316, 0xec4899, 0x818cf8, 0x4ade80, 0x22d3ee, 0xfb7185];
+
+    function spawnConfetti(count = 80) {
+      for (let i = 0; i < count; i++) {
+        const geo = new THREE.PlaneGeometry(0.1 + Math.random() * 0.12, 0.1 + Math.random() * 0.12);
+        const mat = new THREE.MeshBasicMaterial({
+          color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+          transparent: true, opacity: 1, side: THREE.DoubleSide,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set((Math.random() - 0.5) * 8, 3 + Math.random() * 4, (Math.random() - 0.5) * 3);
+        mesh.rotation.set(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2);
+        mesh.userData = {
+          vx: (Math.random() - 0.5) * 0.04,
+          vy: -(0.015 + Math.random() * 0.03),
+          vr: (Math.random() - 0.5) * 0.1,
+          life: 1, decay: 0.003 + Math.random() * 0.004,
+        };
+        threeScene.add(mesh);
+        confettiParticles.push(mesh);
+      }
+    }
+
+    function updateConfetti() {
+      for (let i = confettiParticles.length - 1; i >= 0; i--) {
+        const p = confettiParticles[i];
+        const d = p.userData;
+        p.position.x += d.vx;
+        p.position.y += d.vy;
+        p.rotation.x += d.vr;
+        p.rotation.y += d.vr * 0.7;
+        d.life -= d.decay;
+        p.material.opacity = Math.max(0, d.life);
+        if (d.life <= 0) {
+          threeScene.remove(p);
+          p.geometry.dispose(); p.material.dispose();
+          confettiParticles.splice(i, 1);
+        }
+      }
+    }
+
+    // =====================================================
+    //  CAMERA & COLOR DETECTION
+    // =====================================================
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+        });
+        cameraVideo.srcObject = stream;
+        camPreviewVideo.srcObject = stream;
+        await cameraVideo.play();
+        detectCanvas.width = cameraVideo.videoWidth || 640;
+        detectCanvas.height = cameraVideo.videoHeight || 480;
+        camMaskCanvas.width = 160;
+        camMaskCanvas.height = 120;
+        state.cameraReady = true;
+        return true;
+      } catch (e) {
+        console.error('Camera error:', e);
+        return false;
+      }
+    }
+
+    // Convert RGB to HSV
+    function rgbToHsv(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      const d = max - min;
+      let h = 0, s = max === 0 ? 0 : d / max, v = max;
+      if (d !== 0) {
+        if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        else if (max === g) h = ((b - r) / d + 2) / 6;
+        else h = ((r - g) / d + 4) / 6;
+      }
+      return [h * 360, s, v];
+    }
+
+    // Detect colored blobs via HSV filtering + connected components
+    function detectColorBlobs() {
+      if (!state.cameraReady || !cameraVideo.videoWidth) return [];
+
+      const vw = detectCanvas.width;
+      const vh = detectCanvas.height;
+      detectCtx.drawImage(cameraVideo, 0, 0, vw, vh);
+      const imageData = detectCtx.getImageData(0, 0, vw, vh);
+      const data = imageData.data;
+
+      const preset = COLOR_PRESETS[state.selectedColor];
+      const hueCenter = preset.hue;
+      const hueRange = state.sensitivity;
+      const satMin = preset.sat;
+      const valMin = preset.val;
+
+      // Create binary mask
+      const mask = new Uint8Array(vw * vh);
+      // Downscale for performance: process every 2nd pixel
+      const step = 2;
+      for (let y = 0; y < vh; y += step) {
+        for (let x = 0; x < vw; x += step) {
+          const idx = (y * vw + x) * 4;
+          const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+          const [h, s, v] = rgbToHsv(r, g, b);
+          let hueDiff = Math.abs(h - hueCenter);
+          if (hueDiff > 180) hueDiff = 360 - hueDiff;
+          if (hueDiff <= hueRange && s >= satMin && v >= valMin) {
+            // Fill the step x step block
+            for (let dy = 0; dy < step && y + dy < vh; dy++) {
+              for (let dx = 0; dx < step && x + dx < vw; dx++) {
+                mask[(y + dy) * vw + (x + dx)] = 1;
+              }
+            }
+          }
+        }
+      }
+
+      // Draw mask to preview canvas
+      const maskImgData = camMaskCtx.createImageData(160, 120);
+      const scaleX = vw / 160, scaleY = vh / 120;
+      const cssColor = preset.css;
+      const cr = parseInt(cssColor.slice(1, 3), 16);
+      const cg = parseInt(cssColor.slice(3, 5), 16);
+      const cb = parseInt(cssColor.slice(5, 7), 16);
+      for (let my = 0; my < 120; my++) {
+        for (let mx = 0; mx < 160; mx++) {
+          const sx = Math.floor(mx * scaleX);
+          const sy = Math.floor(my * scaleY);
+          const pidx = (my * 160 + mx) * 4;
+          if (mask[sy * vw + sx]) {
+            maskImgData.data[pidx] = cr;
+            maskImgData.data[pidx + 1] = cg;
+            maskImgData.data[pidx + 2] = cb;
+            maskImgData.data[pidx + 3] = 220;
+          } else {
+            // Show dim camera
+            const srcIdx = (sy * vw + sx) * 4;
+            maskImgData.data[pidx] = data[srcIdx] * 0.3;
+            maskImgData.data[pidx + 1] = data[srcIdx + 1] * 0.3;
+            maskImgData.data[pidx + 2] = data[srcIdx + 2] * 0.3;
+            maskImgData.data[pidx + 3] = 255;
+          }
+        }
+      }
+      camMaskCtx.putImageData(maskImgData, 0, 0);
+
+      // Connected component labeling (simple flood fill)
+      const labels = new Int32Array(vw * vh);
+      let nextLabel = 1;
+      const blobPixelCounts = {};
+      const blobBounds = {};
+
+      for (let y = 0; y < vh; y++) {
+        for (let x = 0; x < vw; x++) {
+          const i = y * vw + x;
+          if (mask[i] && !labels[i]) {
+            const label = nextLabel++;
+            blobPixelCounts[label] = 0;
+            blobBounds[label] = { minX: x, minY: y, maxX: x, maxY: y };
+            // BFS flood fill
+            const queue = [i];
+            labels[i] = label;
+            while (queue.length > 0) {
+              const ci = queue.pop();
+              const cx = ci % vw, cy = (ci - cx) / vw;
+              blobPixelCounts[label]++;
+              const bb = blobBounds[label];
+              if (cx < bb.minX) bb.minX = cx;
+              if (cx > bb.maxX) bb.maxX = cx;
+              if (cy < bb.minY) bb.minY = cy;
+              if (cy > bb.maxY) bb.maxY = cy;
+              // 4-connected neighbors
+              const neighbors = [
+                cy > 0 ? ci - vw : -1,
+                cy < vh - 1 ? ci + vw : -1,
+                cx > 0 ? ci - 1 : -1,
+                cx < vw - 1 ? ci + 1 : -1,
+              ];
+              for (const ni of neighbors) {
+                if (ni >= 0 && mask[ni] && !labels[ni]) {
+                  labels[ni] = label;
+                  queue.push(ni);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Filter blobs by min size, sort by area descending, limit count
+      const minPixels = state.minSize;
+      const maxObj = state.maxObjects;
+      let blobs = [];
+      for (const lbl in blobPixelCounts) {
+        if (blobPixelCounts[lbl] >= minPixels) {
+          const bb = blobBounds[lbl];
+          blobs.push({
+            pixels: blobPixelCounts[lbl],
+            x: bb.minX, y: bb.minY,
+            w: bb.maxX - bb.minX, h: bb.maxY - bb.minY,
+          });
+        }
+      }
+      blobs.sort((a, b) => b.pixels - a.pixels);
+      blobs = blobs.slice(0, maxObj);
+
+      // Map from video coords to game canvas coords (mirrored)
+      const W = gameCanvas.width, H = gameCanvas.height;
+      return blobs.map(bl => ({
+        x: W - ((bl.x + bl.w) / vw) * W,
+        y: (bl.y / vh) * H,
+        w: (bl.w / vw) * W,
+        h: (bl.h / vh) * H,
+      }));
+    }
+
+    // Smooth walls (interpolate between old and new positions)
+    function smoothWalls(newWalls) {
+      if (state.frozen && state.frozenWalls) return state.frozenWalls;
+
+      if (state.walls.length === 0 || newWalls.length !== state.walls.length) {
+        return newWalls;
+      }
+      // Try to match old walls to new walls by proximity
+      const result = [];
+      const used = new Set();
+      for (const nw of newWalls) {
+        let bestIdx = -1, bestDist = Infinity;
+        for (let i = 0; i < state.walls.length; i++) {
+          if (used.has(i)) continue;
+          const ow = state.walls[i];
+          const dist = Math.hypot(nw.x - ow.x, nw.y - ow.y);
+          if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+        }
+        if (bestIdx >= 0 && bestDist < 200) {
+          used.add(bestIdx);
+          const ow = state.walls[bestIdx];
+          const t = WALL_SMOOTHING;
+          result.push({
+            x: ow.x + (nw.x - ow.x) * t,
+            y: ow.y + (nw.y - ow.y) * t,
+            w: ow.w + (nw.w - ow.w) * t,
+            h: ow.h + (nw.h - ow.h) * t,
+          });
+        } else {
+          result.push(nw);
+        }
+      }
+      return result;
+    }
+
+    // =====================================================
+    //  PHYSICS
+    // =====================================================
+    function getLevelConfig() { return LEVELS[state.level]; }
+
+    function getBasketRect() {
+      const cfg = getLevelConfig();
+      const W = gameCanvas.width, H = gameCanvas.height;
+      const bw = cfg.basketW * W;
+      const bh = cfg.basketH * H;
+      return {
+        x: W - bw - W * 0.06,
+        y: H - bh - H * 0.08,
+        w: bw,
+        h: bh,
+      };
+    }
+
+    function getLaunchPoint() {
+      const W = gameCanvas.width, H = gameCanvas.height;
+      return { x: W * 0.08, y: H * 0.12 };
+    }
+
+    function spawnBall() {
+      if (state.balls.length >= BALL_MAX) return;
+      const cfg = getLevelConfig();
+      const lp = getLaunchPoint();
+      const angle = Math.PI * 0.2 + Math.random() * Math.PI * 0.15; // Roughly down-right
+      const speed = cfg.ballSpeed + (Math.random() - 0.5) * 1.0;
+      state.balls.push({
+        x: lp.x,
+        y: lp.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        trail: [],
+        alive: true,
+        age: 0,
+        hue: Math.random() * 360,
+      });
+    }
+
+    function updateBalls(dt) {
+      const cfg = getLevelConfig();
+      const W = gameCanvas.width, H = gameCanvas.height;
+      const basket = getBasketRect();
+      const walls = state.frozen && state.frozenWalls ? state.frozenWalls : state.walls;
+      const r = BALL_RADIUS;
+
+      for (const ball of state.balls) {
+        if (!ball.alive) continue;
+        ball.age += dt;
+
+        // Record trail
+        ball.trail.push({ x: ball.x, y: ball.y });
+        if (ball.trail.length > BALL_TRAIL_LEN) ball.trail.shift();
+
+        // Gravity
+        ball.vy += cfg.gravity;
+
+        // Update position
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        // Wall bounces (screen edges)
+        if (ball.x - r < 0) { ball.x = r; ball.vx = Math.abs(ball.vx) * ENERGY_LOSS; triggerBounceEffect(ball); }
+        if (ball.x + r > W) { ball.x = W - r; ball.vx = -Math.abs(ball.vx) * ENERGY_LOSS; triggerBounceEffect(ball); }
+        if (ball.y - r < 0) { ball.y = r; ball.vy = Math.abs(ball.vy) * ENERGY_LOSS; triggerBounceEffect(ball); }
+
+        // Bottom: ball dies
+        if (ball.y - r > H + 50) {
+          ball.alive = false;
+          continue;
+        }
+
+        // Bounce off detected walls
+        for (const wall of walls) {
+          if (ballRectCollision(ball, wall, r)) {
+            resolveBallWallCollision(ball, wall, r);
+            triggerBounceEffect(ball);
+            audio.playBounce(0.3, 0.8 + Math.random() * 0.4);
+          }
+        }
+
+        // Check basket
+        const bcx = ball.x, bcy = ball.y;
+        if (bcx >= basket.x && bcx <= basket.x + basket.w &&
+            bcy >= basket.y && bcy <= basket.y + basket.h) {
+          ball.alive = false;
+          onScore(ball);
+        }
+      }
+
+      // Remove dead balls
+      state.balls = state.balls.filter(b => b.alive);
+    }
+
+    function ballRectCollision(ball, rect, r) {
+      const closestX = Math.max(rect.x, Math.min(ball.x, rect.x + rect.w));
+      const closestY = Math.max(rect.y, Math.min(ball.y, rect.y + rect.h));
+      const dx = ball.x - closestX, dy = ball.y - closestY;
+      return dx * dx + dy * dy < r * r;
+    }
+
+    function resolveBallWallCollision(ball, rect, r) {
+      // Find which edge is closest and reflect
+      const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+      const dx = ball.x - cx, dy = ball.y - cy;
+      const hw = rect.w / 2 + r, hh = rect.h / 2 + r;
+
+      // Overlap ratios
+      const ox = hw - Math.abs(dx), oy = hh - Math.abs(dy);
+
+      if (ox < oy) {
+        // Horizontal collision
+        ball.x = dx > 0 ? rect.x + rect.w + r : rect.x - r;
+        ball.vx = -ball.vx * ENERGY_LOSS;
+      } else {
+        // Vertical collision
+        ball.y = dy > 0 ? rect.y + rect.h + r : rect.y - r;
+        ball.vy = -ball.vy * ENERGY_LOSS;
+      }
+    }
+
+    function triggerBounceEffect(ball) {
+      for (let i = 0; i < 4; i++) {
+        state.particles.push({
+          x: ball.x, y: ball.y,
+          vx: (Math.random() - 0.5) * 3,
+          vy: (Math.random() - 0.5) * 3,
+          life: 1, decay: 0.04 + Math.random() * 0.03,
+          size: 2 + Math.random() * 3,
+          hue: ball.hue,
+        });
+      }
+    }
+
+    function onScore(ball) {
+      state.score++;
+      hudScore.textContent = state.score;
+      audio.playScore();
+
+      // Floating text
+      spawnFloatText('+1', ball.x, ball.y, '#fbbf24');
+
+      // Particles
+      for (let i = 0; i < 16; i++) {
+        state.particles.push({
+          x: ball.x, y: ball.y,
+          vx: (Math.random() - 0.5) * 6,
+          vy: (Math.random() - 1) * 5,
+          life: 1, decay: 0.02 + Math.random() * 0.02,
+          size: 3 + Math.random() * 4,
+          hue: 40 + Math.random() * 30,
+        });
+      }
+
+      const cfg = getLevelConfig();
+      if (state.score >= cfg.target) {
+        onLevelComplete();
+      }
+    }
+
+    // =====================================================
+    //  GAME FLOW
+    // =====================================================
+    function startLevel(levelIdx) {
+      state.level = levelIdx;
+      state.score = 0;
+      state.balls = [];
+      state.particles = [];
+      state.floatingTexts = [];
+      state.lastSpawn = 0;
+      const cfg = getLevelConfig();
+      state.timeLeft = cfg.time;
+      state.spawnSpeed = cfg.spawnMs;
+      ctrlSpawnSpeed.value = cfg.spawnMs;
+
+      hudScore.textContent = '0';
+      hudTarget.textContent = cfg.target;
+      hudTimer.textContent = cfg.time;
+      hudTimer.classList.remove('warning');
+      levelBadge.textContent = cfg.name;
+
+      // Show level intro
+      levelIntroTitle.textContent = cfg.name;
+      levelIntroDesc.textContent = cfg.desc;
+      levelIntroTarget.textContent = 'Muc tieu: ' + cfg.target + ' bong trong ' + cfg.time + ' giay';
+      levelIntro.classList.add('show');
+      state.phase = 'levelIntro';
+    }
+
+    function beginPlaying() {
+      levelIntro.classList.remove('show');
+      state.phase = 'playing';
+      showGameUI(true);
+
+      // Start timer
+      clearInterval(state.timerInterval);
+      state.timerInterval = setInterval(() => {
+        if (state.phase !== 'playing') return;
+        state.timeLeft--;
+        hudTimer.textContent = state.timeLeft;
+        if (state.timeLeft <= 10) hudTimer.classList.add('warning');
+        if (state.timeLeft <= 0) {
+          clearInterval(state.timerInterval);
+          onTimeUp();
+        }
+      }, 1000);
+    }
+
+    function onLevelComplete() {
+      clearInterval(state.timerInterval);
+      state.phase = 'paused';
+
+      audio.playWin();
+      spawnConfetti(100);
+
+      const cfg = getLevelConfig();
+      spawnFloatText('MAN ' + (state.level + 1) + ' HOAN THANH!', gameCanvas.width / 2, gameCanvas.height / 2 - 40, '#4ade80');
+
+      setTimeout(() => {
+        if (state.level + 1 >= LEVELS.length) {
+          showWin();
+        } else {
+          startLevel(state.level + 1);
+        }
+      }, 2500);
+    }
+
+    function onTimeUp() {
+      state.phase = 'paused';
+      audio.playLose();
+      const cfg = getLevelConfig();
+      loseSub.textContent = 'Ban dat duoc ' + state.score + '/' + cfg.target + ' bong. Thu lai nhe!';
+      showGameUI(false);
+      loseScreen.classList.add('show');
+    }
+
+    function showWin() {
+      state.phase = 'win';
+      showGameUI(false);
+
+      // Calculate stars based on total performance
+      const totalTarget = LEVELS.reduce((s, l) => s + l.target, 0);
+      const stars = 3; // Completed all levels = 3 stars
+      let starStr = '';
+      for (let i = 0; i < stars; i++) starStr += '⭐';
+      winStars.textContent = starStr;
+      winStats.innerHTML = 'Ban da hoan thanh tat ca <b>3 man choi</b>!<br>Tong so bong: <b>' + totalTarget + '</b>';
+      winScreen.classList.add('show');
+
+      audio.playWin();
+      spawnConfetti(150);
+    }
+
+    function showGameUI(show) {
+      gameHud.classList.toggle('show', show);
+      levelBadge.classList.toggle('show', show);
+      controlsPanel.classList.toggle('show', show);
+      cameraPreview.classList.toggle('show', show);
+    }
+
+    // =====================================================
+    //  RENDERING
+    // =====================================================
+    function resizeCanvas() {
+      gameCanvas.width = window.innerWidth;
+      gameCanvas.height = window.innerHeight;
+      threeCanvasEl.width = window.innerWidth;
+      threeCanvasEl.height = window.innerHeight;
+      if (threeRenderer) {
+        threeRenderer.setSize(window.innerWidth, window.innerHeight);
+        threeCamera.aspect = window.innerWidth / window.innerHeight;
+        threeCamera.updateProjectionMatrix();
+      }
+    }
+
+    function drawBackground() {
+      const W = gameCanvas.width, H = gameCanvas.height;
+      // Dark gradient
+      const grad = gc.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#0f0520');
+      grad.addColorStop(1, '#1a0a3e');
+      gc.fillStyle = grad;
+      gc.fillRect(0, 0, W, H);
+
+      // Grid
+      gc.strokeStyle = 'rgba(255,255,255,0.03)';
+      gc.lineWidth = 1;
+      const gridSize = 50;
+      for (let x = 0; x < W; x += gridSize) {
+        gc.beginPath(); gc.moveTo(x, 0); gc.lineTo(x, H); gc.stroke();
+      }
+      for (let y = 0; y < H; y += gridSize) {
+        gc.beginPath(); gc.moveTo(0, y); gc.lineTo(W, y); gc.stroke();
+      }
+    }
+
+    function drawLaunchPoint() {
+      const lp = getLaunchPoint();
+      const t = performance.now() / 1000;
+
+      // Pulsing circle
+      gc.save();
+      gc.globalAlpha = 0.3 + 0.15 * Math.sin(t * 3);
+      gc.beginPath();
+      gc.arc(lp.x, lp.y, 24 + 4 * Math.sin(t * 2), 0, Math.PI * 2);
+      gc.fillStyle = 'rgba(249,115,22,0.2)';
+      gc.fill();
+      gc.strokeStyle = '#f97316';
+      gc.lineWidth = 2;
+      gc.stroke();
+      gc.restore();
+
+      // Inner dot
+      gc.save();
+      gc.beginPath();
+      gc.arc(lp.x, lp.y, 6, 0, Math.PI * 2);
+      gc.fillStyle = '#f97316';
+      gc.fill();
+      gc.restore();
+
+      // Label
+      gc.save();
+      gc.font = '600 12px Fredoka, sans-serif';
+      gc.fillStyle = 'rgba(249,115,22,0.7)';
+      gc.textAlign = 'center';
+      gc.fillText('PHONG BONG', lp.x, lp.y - 32);
+      gc.restore();
+
+      // Trajectory preview arc
+      const cfg = getLevelConfig();
+      gc.save();
+      gc.setLineDash([6, 6]);
+      gc.strokeStyle = 'rgba(249,115,22,0.15)';
+      gc.lineWidth = 1.5;
+      gc.beginPath();
+      let px = lp.x, py = lp.y;
+      let pvx = Math.cos(Math.PI * 0.25) * cfg.ballSpeed;
+      let pvy = Math.sin(Math.PI * 0.25) * cfg.ballSpeed;
+      gc.moveTo(px, py);
+      for (let i = 0; i < 30; i++) {
+        pvy += cfg.gravity;
+        px += pvx; py += pvy;
+        gc.lineTo(px, py);
+      }
+      gc.stroke();
+      gc.restore();
+    }
+
+    function drawBasket() {
+      const basket = getBasketRect();
+      const t = performance.now() / 1000;
+
+      // Backboard glow
+      gc.save();
+      gc.shadowColor = 'rgba(251,191,36,0.3)';
+      gc.shadowBlur = 20;
+      gc.fillStyle = 'rgba(251,191,36,0.05)';
+      gc.fillRect(basket.x - 4, basket.y - 4, basket.w + 8, basket.h + 8);
+      gc.restore();
+
+      // Rim (top edge)
+      gc.save();
+      gc.strokeStyle = '#f97316';
+      gc.lineWidth = 4;
+      gc.shadowColor = '#f97316';
+      gc.shadowBlur = 12;
+      gc.beginPath();
+      gc.moveTo(basket.x, basket.y);
+      gc.lineTo(basket.x + basket.w, basket.y);
+      gc.stroke();
+      gc.restore();
+
+      // Net lines
+      gc.save();
+      gc.strokeStyle = 'rgba(255,255,255,0.2)';
+      gc.lineWidth = 1;
+      const netSegments = 6;
+      const netDepth = basket.h;
+      for (let i = 0; i <= netSegments; i++) {
+        const xStart = basket.x + (basket.w / netSegments) * i;
+        const xEnd = basket.x + basket.w * 0.15 + (basket.w * 0.7 / netSegments) * i;
+        gc.beginPath();
+        gc.moveTo(xStart, basket.y);
+        // Slight wave
+        const wave = Math.sin(t * 2 + i) * 3;
+        gc.quadraticCurveTo(
+          (xStart + xEnd) / 2 + wave,
+          basket.y + netDepth * 0.5,
+          xEnd,
+          basket.y + netDepth
+        );
+        gc.stroke();
+      }
+      // Horizontal net lines
+      for (let j = 1; j <= 3; j++) {
+        const yy = basket.y + (netDepth / 4) * j;
+        const shrink = j * 0.05 * basket.w;
+        gc.beginPath();
+        gc.moveTo(basket.x + shrink, yy);
+        gc.lineTo(basket.x + basket.w - shrink, yy);
+        gc.stroke();
+      }
+      gc.restore();
+
+      // Side posts
+      gc.save();
+      gc.strokeStyle = 'rgba(249,115,22,0.5)';
+      gc.lineWidth = 3;
+      gc.beginPath();
+      gc.moveTo(basket.x, basket.y);
+      gc.lineTo(basket.x + basket.w * 0.15, basket.y + basket.h);
+      gc.stroke();
+      gc.beginPath();
+      gc.moveTo(basket.x + basket.w, basket.y);
+      gc.lineTo(basket.x + basket.w * 0.85, basket.y + basket.h);
+      gc.stroke();
+      gc.restore();
+
+      // Label
+      gc.save();
+      gc.font = '600 12px Fredoka, sans-serif';
+      gc.fillStyle = 'rgba(249,115,22,0.6)';
+      gc.textAlign = 'center';
+      gc.fillText('RO', basket.x + basket.w / 2, basket.y + basket.h + 20);
+      gc.restore();
+    }
+
+    function drawWalls() {
+      const walls = state.frozen && state.frozenWalls ? state.frozenWalls : state.walls;
+      const preset = COLOR_PRESETS[state.selectedColor];
+      const t = performance.now() / 1000;
+
+      for (let i = 0; i < walls.length; i++) {
+        const w = walls[i];
+
+        // Outer glow
+        gc.save();
+        gc.shadowColor = preset.glow + '0.5)';
+        gc.shadowBlur = 16;
+        gc.fillStyle = preset.glow + '0.12)';
+        gc.beginPath();
+        roundRect(gc, w.x - 2, w.y - 2, w.w + 4, w.h + 4, 8);
+        gc.fill();
+        gc.restore();
+
+        // Wall fill
+        gc.save();
+        const wallGrad = gc.createLinearGradient(w.x, w.y, w.x + w.w, w.y + w.h);
+        wallGrad.addColorStop(0, preset.glow + '0.25)');
+        wallGrad.addColorStop(1, preset.glow + '0.15)');
+        gc.fillStyle = wallGrad;
+        gc.beginPath();
+        roundRect(gc, w.x, w.y, w.w, w.h, 6);
+        gc.fill();
+        gc.restore();
+
+        // Border
+        gc.save();
+        gc.strokeStyle = preset.glow + (0.5 + 0.2 * Math.sin(t * 3 + i)) + ')';
+        gc.lineWidth = 2;
+        gc.beginPath();
+        roundRect(gc, w.x, w.y, w.w, w.h, 6);
+        gc.stroke();
+        gc.restore();
+
+        // Scanline effect
+        gc.save();
+        gc.globalAlpha = 0.06;
+        for (let sy = w.y; sy < w.y + w.h; sy += 4) {
+          gc.fillStyle = '#fff';
+          gc.fillRect(w.x, sy, w.w, 1);
+        }
+        gc.restore();
+
+        // Frozen indicator
+        if (state.frozen) {
+          gc.save();
+          gc.font = '600 11px Fredoka, sans-serif';
+          gc.fillStyle = 'rgba(255,255,255,0.5)';
+          gc.textAlign = 'center';
+          gc.fillText('❄', w.x + w.w / 2, w.y + w.h / 2 + 4);
+          gc.restore();
+        }
+      }
+    }
+
+    function drawBalls() {
+      for (const ball of state.balls) {
+        if (!ball.alive) continue;
+
+        // Trail
+        for (let i = 0; i < ball.trail.length; i++) {
+          const t = ball.trail[i];
+          const alpha = (i / ball.trail.length) * 0.35;
+          const size = BALL_RADIUS * (i / ball.trail.length) * 0.7;
+          gc.save();
+          gc.globalAlpha = alpha;
+          gc.beginPath();
+          gc.arc(t.x, t.y, size, 0, Math.PI * 2);
+          gc.fillStyle = `hsl(${ball.hue}, 80%, 60%)`;
+          gc.fill();
+          gc.restore();
+        }
+
+        // Ball body
+        gc.save();
+        gc.shadowColor = `hsla(${ball.hue}, 90%, 55%, 0.6)`;
+        gc.shadowBlur = 14;
+        const ballGrad = gc.createRadialGradient(
+          ball.x - BALL_RADIUS * 0.3, ball.y - BALL_RADIUS * 0.3, BALL_RADIUS * 0.1,
+          ball.x, ball.y, BALL_RADIUS
+        );
+        ballGrad.addColorStop(0, `hsl(${ball.hue}, 85%, 75%)`);
+        ballGrad.addColorStop(0.6, `hsl(${ball.hue}, 80%, 55%)`);
+        ballGrad.addColorStop(1, `hsl(${ball.hue}, 75%, 35%)`);
+        gc.fillStyle = ballGrad;
+        gc.beginPath();
+        gc.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+        gc.fill();
+        gc.restore();
+
+        // Highlight
+        gc.save();
+        gc.globalAlpha = 0.4;
+        gc.beginPath();
+        gc.arc(ball.x - BALL_RADIUS * 0.25, ball.y - BALL_RADIUS * 0.25, BALL_RADIUS * 0.35, 0, Math.PI * 2);
+        gc.fillStyle = '#fff';
+        gc.fill();
+        gc.restore();
+      }
+    }
+
+    function drawParticles() {
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        p.x += p.vx; p.y += p.vy;
+        p.vy += 0.05;
+        p.life -= p.decay;
+        if (p.life <= 0) { state.particles.splice(i, 1); continue; }
+        gc.save();
+        gc.globalAlpha = p.life;
+        gc.beginPath();
+        gc.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        gc.fillStyle = `hsl(${p.hue}, 80%, 60%)`;
+        gc.fill();
+        gc.restore();
+      }
+    }
+
+    function drawFloatingTexts() {
+      // Managed via DOM, no canvas drawing needed
+    }
+
+    function spawnFloatText(text, x, y, color) {
+      const el = document.createElement('div');
+      el.className = 'float-text';
+      el.textContent = text;
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      el.style.color = color;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1200);
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    // =====================================================
+    //  MAIN GAME LOOP
+    // =====================================================
+    let lastTime = 0;
+    let detectionTimer = 0;
+    const DETECTION_INTERVAL = 80; // ms between detections (~12fps)
+
+    function gameLoop(timestamp) {
+      requestAnimationFrame(gameLoop);
+      const dt = Math.min(timestamp - (lastTime || timestamp), 33); // Cap at ~30fps delta
+      lastTime = timestamp;
+
+      // --- Color detection ---
+      if (state.cameraReady && (state.phase === 'playing' || state.phase === 'levelIntro' || state.phase === 'paused')) {
+        detectionTimer += dt;
+        if (detectionTimer >= DETECTION_INTERVAL) {
+          detectionTimer = 0;
+          const newWalls = detectColorBlobs();
+          state.walls = smoothWalls(newWalls);
+          hudWalls.textContent = state.walls.length;
+        }
+      }
+
+      // --- Game canvas rendering ---
+      resizeCanvas();
+      drawBackground();
+
+      if (state.phase === 'playing' || state.phase === 'paused' || state.phase === 'levelIntro') {
+        drawLaunchPoint();
+        drawBasket();
+        drawWalls();
+        drawBalls();
+        drawParticles();
+      }
+
+      // --- Ball spawning ---
+      if (state.phase === 'playing') {
+        const spawnInterval = parseInt(ctrlSpawnSpeed.value) || state.spawnSpeed;
+        if (timestamp - state.lastSpawn > spawnInterval) {
+          state.lastSpawn = timestamp;
+          spawnBall();
+        }
+        updateBalls(1);
+      }
+
+      // --- Three.js ---
+      updateConfetti();
+      if (threeRenderer) {
+        threeRenderer.render(threeScene, threeCamera);
+      }
+    }
+
+    // =====================================================
+    //  EVENT HANDLERS
+    // =====================================================
+    startBtn.addEventListener('click', async () => {
+      audio.init();
+      startScreen.classList.add('hidden');
+      loadingScreen.classList.remove('hidden');
+      loadingText.textContent = 'Dang bat camera...';
+
+      const ok = await startCamera();
+      if (!ok) {
+        loadingText.textContent = 'Khong the bat camera. Vui long cho phep truy cap!';
+        return;
+      }
+
+      loadingScreen.classList.add('hidden');
+      startLevel(0);
+    });
+
+    levelIntroBtn.addEventListener('click', () => {
+      beginPlaying();
+    });
+
+    replayBtn.addEventListener('click', () => {
+      winScreen.classList.remove('show');
+      startLevel(0);
+    });
+
+    retryBtn.addEventListener('click', () => {
+      loseScreen.classList.remove('show');
+      startLevel(state.level);
+    });
+
+    ctrlLevel.addEventListener('change', (e) => {
+      const lvl = parseInt(e.target.value);
+      if (state.phase === 'playing' || state.phase === 'paused') {
+        clearInterval(state.timerInterval);
+      }
+      startLevel(lvl);
+    });
+
+    // Color chips
+    document.querySelectorAll('.color-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        state.selectedColor = chip.dataset.color;
+      });
+    });
+
+    ctrlSensitivity.addEventListener('input', (e) => { state.sensitivity = parseInt(e.target.value); });
+    ctrlMinSize.addEventListener('input', (e) => { state.minSize = parseInt(e.target.value); });
+    ctrlMaxObjects.addEventListener('input', (e) => { state.maxObjects = parseInt(e.target.value); });
+
+    // Freeze toggle
+    ctrlFreeze.addEventListener('click', () => {
+      state.frozen = !state.frozen;
+      if (state.frozen) {
+        state.frozenWalls = [...state.walls];
+        ctrlFreeze.classList.add('active');
+        ctrlFreeze.textContent = '❄ Da dong bang';
+      } else {
+        state.frozenWalls = null;
+        ctrlFreeze.classList.remove('active');
+        ctrlFreeze.textContent = '❄ Dong bang';
+      }
+    });
+
+    // Projection toggle
+    ctrlProjection.addEventListener('click', () => {
+      state.projection = !state.projection;
+      document.body.classList.toggle('projection', state.projection);
+      ctrlProjection.classList.toggle('active', state.projection);
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if (key === 'p') {
+        state.projection = !state.projection;
+        document.body.classList.toggle('projection', state.projection);
+        ctrlProjection.classList.toggle('active', state.projection);
+      } else if (key === 'f') {
+        ctrlFreeze.click();
+      } else if (key === 'b') {
+        if (state.phase === 'playing') spawnBall();
+      } else if (key === ' ') {
+        e.preventDefault();
+        if (state.phase === 'start') startBtn.click();
+        else if (state.phase === 'levelIntro') levelIntroBtn.click();
+      } else if (key === 'n') {
+        if (state.phase === 'playing' && state.level + 1 < LEVELS.length) {
+          clearInterval(state.timerInterval);
+          startLevel(state.level + 1);
+        }
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+    });
+
+    // =====================================================
+    //  BOOTSTRAP
+    // =====================================================
+    resizeCanvas();
+    initThree();
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>

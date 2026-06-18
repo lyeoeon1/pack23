@@ -262,8 +262,10 @@
 
   <!-- Loading screen -->
   <div class="loading-screen hidden" id="loadingScreen">
-    <div class="spinner"></div>
-    <div class="loading-text">Dang tai AI...</div>
+    <div class="spinner" id="loadingSpinner"></div>
+    <div class="loading-text" id="loadingText">Dang tai AI...</div>
+    <button class="retry-btn hidden" id="retryBtn" style="margin-top:20px;padding:14px 36px;border:none;border-radius:999px;background:linear-gradient(135deg,#f97316,#ec4899);color:#fff;font-family:'Fredoka',sans-serif;font-size:18px;font-weight:600;cursor:pointer;">Thu lai</button>
+    <a href="../index.html" style="display:block;margin-top:14px;color:rgba(255,255,255,0.5);font-size:14px;text-decoration:underline;">Ve trang chu</a>
   </div>
 
   <!-- Win screen -->
@@ -817,25 +819,51 @@
     // ============================
     //  Init and game loop
     // ============================
+    const loadingText = document.getElementById('loadingText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const retryBtn = document.getElementById('retryBtn');
+
+    function showLoadingError(msg) {
+      loadingText.textContent = msg;
+      loadingSpinner.style.display = 'none';
+      retryBtn.classList.remove('hidden');
+    }
+
+    retryBtn.onclick = () => {
+      retryBtn.classList.add('hidden');
+      loadingSpinner.style.display = '';
+      startGame();
+    };
+
     async function startGame() {
       startScreen.classList.add('hidden');
       loadingScreen.classList.remove('hidden');
+      loadingText.textContent = 'Buoc 1/2: Tai model AI...';
+      loadingSpinner.style.display = '';
+      retryBtn.classList.add('hidden');
 
       audio.init();
 
       try {
-        await vision.initObjectDetection({ scoreThreshold: 0.25, maxResults: 20 });
+        const initTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Tai qua lau — vui long kiem tra mang va thu lai.')), 30000));
+        await Promise.race([vision.initObjectDetection({ scoreThreshold: 0.25, maxResults: 20 }), initTimeout]);
+      } catch (err) {
+        console.error('AI init error:', err);
+        showLoadingError('Loi tai AI: ' + err.message);
+        return;
+      }
+
+      loadingText.textContent = 'Buoc 2/2: Bat camera...';
+      try {
         const ok = await vision.startCamera();
         if (!ok) {
-          loadingScreen.querySelector('.loading-text').textContent = 'Khong the bat camera. Vui long cho phep truy cap camera!';
+          showLoadingError('Khong the bat camera. Vui long cho phep truy cap camera va thu lai!');
           return;
         }
-
-        // Attach camera stream to the visible video element
         cameraVideo.srcObject = vision.video.srcObject;
       } catch (err) {
-        console.error('Init error:', err);
-        loadingScreen.querySelector('.loading-text').textContent = 'Loi tai AI: ' + err.message;
+        console.error('Camera error:', err);
+        showLoadingError('Loi camera: ' + err.message);
         return;
       }
 

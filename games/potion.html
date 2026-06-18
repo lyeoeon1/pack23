@@ -325,8 +325,10 @@
 
   <!-- Loading -->
   <div id="loadingMsg" class="hidden">
-    <div class="loading-spinner"></div>
-    Dang trieu hoi AI...
+    <div class="loading-spinner" id="potionSpinner"></div>
+    <div id="potionLoadText">Dang trieu hoi AI...</div>
+    <button class="hidden" id="potionRetry" style="margin-top:20px;padding:12px 32px;border:none;border-radius:999px;background:linear-gradient(135deg,#a855f7,#ec4899);color:#fff;font-family:'Fredoka',sans-serif;font-size:16px;font-weight:600;cursor:pointer;">Thu lai</button>
+    <a href="../index.html" style="display:block;margin-top:12px;color:rgba(255,255,255,0.5);font-size:13px;text-decoration:underline;">Ve trang chu</a>
   </div>
 
   <!-- Creature Popup -->
@@ -1308,28 +1310,50 @@
     // =========================================================================
     // INIT
     // =========================================================================
+    const potionLoadText = document.getElementById('potionLoadText');
+    const potionSpinner = document.getElementById('potionSpinner');
+    const potionRetry = document.getElementById('potionRetry');
+
+    function showPotionError(msg) {
+      potionLoadText.textContent = msg;
+      potionSpinner.style.display = 'none';
+      potionRetry.classList.remove('hidden');
+    }
+
+    potionRetry.onclick = () => {
+      potionRetry.classList.add('hidden');
+      potionSpinner.style.display = '';
+      init();
+    };
+
     async function init() {
       $start.classList.add('hidden');
       $loading.classList.remove('hidden');
+      potionLoadText.textContent = 'Buoc 1/2: Tai AI phu thuy...';
+      potionSpinner.style.display = '';
+      potionRetry.classList.add('hidden');
 
       try {
-        // Init Three.js while AI loads
         initThree();
         animateThree();
 
-        // Init vision
-        await vision.initObjectDetection({ scoreThreshold: 0.25, maxResults: 20 });
+        const initTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Tai qua lau — vui long kiem tra mang va thu lai.')), 30000));
+        await Promise.race([vision.initObjectDetection({ scoreThreshold: 0.25, maxResults: 20 }), initTimeout]);
 
-        // Pipe camera to both the video element and vision engine
-        await vision.startCamera();
+        potionLoadText.textContent = 'Buoc 2/2: Bat camera...';
+        const ok = await vision.startCamera();
+        if (!ok) {
+          showPotionError('Khong the bat camera. Vui long cho phep truy cap camera va thu lai!');
+          return;
+        }
 
-        // Use vision's video stream for our background
         videoEl.srcObject = vision.video.srcObject;
-        await new Promise(r => { videoEl.onloadeddata = r; });
+        await Promise.race([
+          new Promise(r => { videoEl.onloadeddata = r; }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('Video timeout')), 8000)),
+        ]);
 
         $loading.classList.add('hidden');
-
-        // Start game
         updateLevelBadge();
         updateCollection();
         startRecipe();
@@ -1337,13 +1361,7 @@
 
       } catch (err) {
         console.error('Init error:', err);
-        $loading.innerHTML = `
-          <div style="color:#f87171;text-align:center;padding:24px;">
-            Khong the khoi dong camera hoac AI.<br>
-            <span style="font-size:14px;color:rgba(255,255,255,0.5);">${err.message || err}</span><br><br>
-            <a href="../index.html" style="color:#a855f7;">Ve trang chu</a>
-          </div>
-        `;
+        showPotionError('Loi: ' + (err.message || err));
       }
     }
 

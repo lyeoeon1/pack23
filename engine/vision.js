@@ -52,19 +52,30 @@ export class VisionEngine {
 
   async startCamera(deviceId = null) {
     if (this.stream) this.stream.getTracks().forEach(t => t.stop());
-    const constraints = { video: { width: 640, height: 480 }, audio: false };
-    if (deviceId) constraints.video.deviceId = { exact: deviceId };
-    else constraints.video.facingMode = 'environment';
-    try {
-      this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-      this.video.srcObject = this.stream;
-      await new Promise(r => { this.video.onloadeddata = r; });
-      this._ready = true;
-      return true;
-    } catch (e) {
-      console.error('Camera error:', e);
-      return false;
+    // Try requested config first, then fallback to simple constraints
+    const configs = [
+      deviceId
+        ? { video: { deviceId: { exact: deviceId }, width: 640, height: 480 }, audio: false }
+        : { video: { facingMode: 'environment', width: 640, height: 480 }, audio: false },
+      { video: { width: 640, height: 480 }, audio: false },
+      { video: true, audio: false },
+    ];
+    for (const constraints of configs) {
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+        this.video.srcObject = this.stream;
+        await Promise.race([
+          new Promise(r => { this.video.onloadeddata = r; }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('Video timeout')), 8000)),
+        ]);
+        this._ready = true;
+        return true;
+      } catch (e) {
+        console.warn('Camera attempt failed:', constraints, e.message);
+      }
     }
+    console.error('All camera configs failed');
+    return false;
   }
 
   get ready() {
