@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hoc Dem - KidZone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      font-family: 'Fredoka', system-ui, sans-serif;
+      background: #1a0a3e;
+    }
+
+    /* ---------- layer stack ---------- */
+    #cameraVideo {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; z-index: 0; transform: scaleX(-1);
+    }
+    #warmOverlay {
+      position: fixed; inset: 0; z-index: 1;
+      background: linear-gradient(
+        180deg,
+        rgba(255,183,77,0.12) 0%,
+        rgba(255,111,97,0.08) 50%,
+        rgba(255,183,77,0.10) 100%
+      );
+      pointer-events: none;
+    }
+    #detectCanvas {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      z-index: 2; pointer-events: none;
+    }
+    #threeCanvas {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      z-index: 3; pointer-events: none;
+    }
+    #uiLayer {
+      position: fixed; inset: 0; z-index: 4;
+      display: flex; flex-direction: column;
+      pointer-events: none;
+    }
+    #uiLayer > * { pointer-events: auto; }
+
+    /* ---------- back button ---------- */
+    .back-btn {
+      position: fixed; top: 16px; left: 16px; z-index: 10;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 20px; border-radius: 999px;
+      background: rgba(0,0,0,0.45); backdrop-filter: blur(8px);
+      color: #fff; font-family: 'Fredoka', sans-serif;
+      font-size: 16px; font-weight: 600;
+      text-decoration: none; border: 2px solid rgba(255,255,255,0.15);
+      transition: all 0.2s;
+    }
+    .back-btn:hover { background: rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.3); }
+
+    /* ---------- level indicator ---------- */
+    .level-badge {
+      position: fixed; top: 16px; right: 16px; z-index: 10;
+      padding: 10px 20px; border-radius: 999px;
+      background: rgba(0,0,0,0.45); backdrop-filter: blur(8px);
+      color: #fbbf24; font-family: 'Fredoka', sans-serif;
+      font-size: 18px; font-weight: 700;
+      border: 2px solid rgba(251,191,36,0.3);
+    }
+
+    /* ---------- target prompt ---------- */
+    .target-prompt {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+      z-index: 10; text-align: center;
+      padding: 12px 32px; border-radius: 24px;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(10px);
+      border: 2px solid rgba(255,255,255,0.15);
+      opacity: 0; transition: opacity 0.4s;
+    }
+    .target-prompt.show { opacity: 1; }
+    .target-prompt .prompt-text {
+      color: #fff; font-size: clamp(18px, 3vw, 28px); font-weight: 700;
+    }
+    .target-prompt .prompt-number {
+      color: #fbbf24; font-size: clamp(28px, 5vw, 48px); font-weight: 700;
+      display: inline-block; transition: transform 0.3s;
+    }
+
+    /* ---------- current count ---------- */
+    .count-display {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 10; text-align: center;
+      padding: 12px 40px; border-radius: 24px;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(10px);
+      border: 2px solid rgba(255,255,255,0.15);
+      opacity: 0; transition: opacity 0.4s;
+    }
+    .count-display.show { opacity: 1; }
+    .count-display .count-label {
+      color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 500;
+    }
+    .count-display .count-value {
+      color: #4ade80; font-size: clamp(36px, 6vw, 56px); font-weight: 700;
+      display: inline-block; transition: transform 0.2s;
+    }
+    .count-display .count-value.bounce {
+      animation: countBounce 0.35s ease;
+    }
+    @keyframes countBounce {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.4); }
+      70% { transform: scale(0.9); }
+      100% { transform: scale(1); }
+    }
+
+    /* ---------- start screen ---------- */
+    .overlay-screen {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, rgba(15,5,32,0.92), rgba(26,10,62,0.95));
+      transition: opacity 0.5s;
+    }
+    .overlay-screen.hidden { opacity: 0; pointer-events: none; }
+    .overlay-screen h1 {
+      font-size: clamp(40px, 8vw, 80px); font-weight: 700;
+      background: linear-gradient(135deg, #fbbf24 0%, #f97316 30%, #ec4899 60%, #818cf8 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+    .overlay-screen .sub {
+      color: rgba(255,255,255,0.6); font-size: clamp(16px, 2.5vw, 22px);
+      margin-bottom: 40px; text-align: center; padding: 0 24px;
+    }
+
+    .start-btn {
+      padding: 18px 56px; border-radius: 999px; border: none; cursor: pointer;
+      font-family: 'Fredoka', sans-serif; font-size: clamp(22px, 4vw, 32px); font-weight: 700;
+      color: #fff; background: linear-gradient(135deg, #f97316, #ec4899);
+      box-shadow: 0 8px 32px rgba(249,115,22,0.4);
+      transition: all 0.2s; position: relative; overflow: hidden;
+    }
+    .start-btn:hover { transform: scale(1.05); box-shadow: 0 12px 40px rgba(249,115,22,0.5); }
+    .start-btn:active { transform: scale(0.97); }
+
+    /* ---------- loading ---------- */
+    .loading-screen {
+      position: fixed; inset: 0; z-index: 25;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(15,5,32,0.95);
+      transition: opacity 0.5s;
+    }
+    .loading-screen.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 56px; height: 56px; border-radius: 50%;
+      border: 5px solid rgba(255,255,255,0.15);
+      border-top-color: #fbbf24;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 24px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text {
+      color: rgba(255,255,255,0.7); font-size: 20px; font-weight: 600;
+    }
+
+    /* ---------- celebration text ---------- */
+    .celebration {
+      position: fixed; inset: 0; z-index: 15;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      pointer-events: none; opacity: 0; transition: opacity 0.3s;
+    }
+    .celebration.show { opacity: 1; }
+    .celebration .celeb-text {
+      font-size: clamp(48px, 10vw, 96px); font-weight: 700;
+      color: #fbbf24; text-shadow: 0 4px 24px rgba(251,191,36,0.5);
+      animation: celebPulse 0.6s ease infinite alternate;
+    }
+    .celebration .celeb-sub {
+      font-size: clamp(20px, 4vw, 36px); font-weight: 600;
+      color: #fff; margin-top: 8px;
+    }
+    @keyframes celebPulse {
+      0% { transform: scale(1) rotate(-2deg); }
+      100% { transform: scale(1.08) rotate(2deg); }
+    }
+
+    /* ---------- win screen ---------- */
+    .win-screen {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, rgba(15,5,32,0.93), rgba(26,10,62,0.96));
+      opacity: 0; pointer-events: none; transition: opacity 0.6s;
+    }
+    .win-screen.show { opacity: 1; pointer-events: auto; }
+    .win-title {
+      font-size: clamp(48px, 10vw, 90px); font-weight: 700;
+      background: linear-gradient(135deg, #fbbf24, #f97316, #ec4899);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 16px;
+    }
+    .win-stars {
+      font-size: clamp(32px, 6vw, 56px); margin-bottom: 32px;
+    }
+    .win-stats {
+      color: rgba(255,255,255,0.7); font-size: clamp(16px, 2.5vw, 22px);
+      margin-bottom: 40px; text-align: center; line-height: 2;
+    }
+    .replay-btn {
+      padding: 16px 48px; border-radius: 999px; border: none; cursor: pointer;
+      font-family: 'Fredoka', sans-serif; font-size: 22px; font-weight: 700;
+      color: #fff; background: linear-gradient(135deg, #4ade80, #22d3ee);
+      box-shadow: 0 8px 28px rgba(74,222,128,0.35);
+      transition: all 0.2s;
+    }
+    .replay-btn:hover { transform: scale(1.05); }
+  </style>
+</head>
+<body>
+
+  <!-- Camera video background -->
+  <video id="cameraVideo" autoplay playsinline muted></video>
+  <div id="warmOverlay"></div>
+
+  <!-- 2D detection overlay canvas -->
+  <canvas id="detectCanvas"></canvas>
+
+  <!-- Three.js transparent overlay -->
+  <canvas id="threeCanvas"></canvas>
+
+  <!-- UI layer -->
+  <div id="uiLayer">
+    <a class="back-btn" href="../index.html">&#8592; Ve trang chu</a>
+    <div class="level-badge" id="levelBadge" style="display:none;"></div>
+    <div class="target-prompt" id="targetPrompt">
+      <div class="prompt-text">Dat <span class="prompt-number" id="targetNum">3</span> do vat!</div>
+    </div>
+    <div class="count-display" id="countDisplay">
+      <div class="count-label">Dang dem:</div>
+      <div class="count-value" id="countValue">0</div>
+    </div>
+  </div>
+
+  <!-- Celebration overlay -->
+  <div class="celebration" id="celebration">
+    <div class="celeb-text" id="celebText">Dung roi!</div>
+    <div class="celeb-sub" id="celebSub"></div>
+  </div>
+
+  <!-- Start screen -->
+  <div class="overlay-screen" id="startScreen">
+    <h1>Hoc Dem</h1>
+    <div class="sub">Dat do vat len ban de hoc dem 1-10 voi AI!</div>
+    <button class="start-btn" id="startBtn">BAT DAU</button>
+  </div>
+
+  <!-- Loading screen -->
+  <div class="loading-screen hidden" id="loadingScreen">
+    <div class="spinner"></div>
+    <div class="loading-text">Dang tai AI...</div>
+  </div>
+
+  <!-- Win screen -->
+  <div class="win-screen" id="winScreen">
+    <div class="win-title">Gioi qua!</div>
+    <div class="win-stars" id="winStars"></div>
+    <div class="win-stats" id="winStats"></div>
+    <button class="replay-btn" id="replayBtn">Choi lai</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { VisionEngine } from '../engine/vision.js';
+    import { AudioSynthesizer } from '../engine/audio.js';
+
+    // ============================
+    //  State
+    // ============================
+    const LEVELS = [
+      { name: 'Man 1', maxTarget: 5, zone: { x: 0.1, y: 0.25, w: 0.8, h: 0.6 } },
+      { name: 'Man 2', maxTarget: 8, zone: { x: 0.12, y: 0.25, w: 0.76, h: 0.55 } },
+      { name: 'Man 3', maxTarget: 10, zone: { x: 0.15, y: 0.28, w: 0.7, h: 0.50 } },
+    ];
+
+    let state = {
+      phase: 'start',         // start | loading | playing | celebration | levelDone | win
+      level: 0,
+      target: 1,
+      currentCount: 0,
+      prevCount: -1,
+      matchStart: 0,           // when correct count was first detected
+      matchDuration: 2000,     // ms to hold correct count
+      stars: 0,
+      totalCorrect: 0,
+      detectionInterval: 66,   // ~15fps
+      lastDetectionTime: 0,
+      lastDetections: [],
+    };
+
+    // ============================
+    //  Engine instances
+    // ============================
+    const vision = new VisionEngine();
+    const audio = new AudioSynthesizer();
+
+    // ============================
+    //  DOM refs
+    // ============================
+    const cameraVideo = document.getElementById('cameraVideo');
+    const detectCanvas = document.getElementById('detectCanvas');
+    const detectCtx = detectCanvas.getContext('2d');
+    const threeCanvasEl = document.getElementById('threeCanvas');
+    const startScreen = document.getElementById('startScreen');
+    const loadingScreen = document.getElementById('loadingScreen');
+    const startBtn = document.getElementById('startBtn');
+    const targetPrompt = document.getElementById('targetPrompt');
+    const targetNum = document.getElementById('targetNum');
+    const countDisplay = document.getElementById('countDisplay');
+    const countValue = document.getElementById('countValue');
+    const levelBadge = document.getElementById('levelBadge');
+    const celebration = document.getElementById('celebration');
+    const celebText = document.getElementById('celebText');
+    const celebSub = document.getElementById('celebSub');
+    const winScreen = document.getElementById('winScreen');
+    const winStars = document.getElementById('winStars');
+    const winStats = document.getElementById('winStats');
+    const replayBtn = document.getElementById('replayBtn');
+
+    // ============================
+    //  Three.js setup
+    // ============================
+    let threeScene, threeCamera, threeRenderer;
+    let confettiParticles = [];
+    let floatingNumber = null;
+    let floatingNumberMat = null;
+    let starMeshes = [];
+
+    function initThree() {
+      threeScene = new THREE.Scene();
+      threeCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+      threeCamera.position.z = 5;
+
+      threeRenderer = new THREE.WebGLRenderer({
+        canvas: threeCanvasEl,
+        alpha: true,
+        antialias: true,
+      });
+      threeRenderer.setSize(window.innerWidth, window.innerHeight);
+      threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      threeRenderer.setClearColor(0x000000, 0);
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      threeScene.add(ambientLight);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+      dirLight.position.set(2, 3, 5);
+      threeScene.add(dirLight);
+      const pointLight = new THREE.PointLight(0xfbbf24, 1.2, 20);
+      pointLight.position.set(0, 2, 3);
+      threeScene.add(pointLight);
+
+      window.addEventListener('resize', () => {
+        threeCamera.aspect = window.innerWidth / window.innerHeight;
+        threeCamera.updateProjectionMatrix();
+        threeRenderer.setSize(window.innerWidth, window.innerHeight);
+        resizeDetectCanvas();
+      });
+    }
+
+    // ---- 3D floating number ----
+    function createFloatingNumber(n) {
+      removeFloatingNumber();
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, 256, 256);
+
+      // Glow circle
+      const gradient = ctx.createRadialGradient(128, 128, 20, 128, 128, 120);
+      gradient.addColorStop(0, 'rgba(251,191,36,0.35)');
+      gradient.addColorStop(1, 'rgba(251,191,36,0)');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(128, 128, 120, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Number
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 160px Fredoka, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(249,115,22,0.6)';
+      ctx.shadowBlur = 20;
+      ctx.fillText(String(n), 128, 128);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+
+      floatingNumberMat = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false,
+      });
+      floatingNumber = new THREE.Sprite(floatingNumberMat);
+      floatingNumber.scale.set(2.2, 2.2, 1);
+      floatingNumber.position.set(0, 1.8, 0);
+      threeScene.add(floatingNumber);
+    }
+
+    function removeFloatingNumber() {
+      if (floatingNumber) {
+        threeScene.remove(floatingNumber);
+        if (floatingNumberMat) { floatingNumberMat.map.dispose(); floatingNumberMat.dispose(); }
+        floatingNumber = null;
+        floatingNumberMat = null;
+      }
+    }
+
+    // ---- Confetti ----
+    const CONFETTI_COLORS = [0xfbbf24, 0xf97316, 0xec4899, 0x818cf8, 0x4ade80, 0x22d3ee, 0xfb7185];
+
+    function spawnConfetti(count = 80) {
+      for (let i = 0; i < count; i++) {
+        const geo = new THREE.PlaneGeometry(0.12 + Math.random() * 0.12, 0.12 + Math.random() * 0.12);
+        const mat = new THREE.MeshBasicMaterial({
+          color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+          transparent: true,
+          opacity: 1,
+          side: THREE.DoubleSide,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(
+          (Math.random() - 0.5) * 8,
+          3 + Math.random() * 4,
+          (Math.random() - 0.5) * 3
+        );
+        mesh.rotation.set(
+          Math.random() * Math.PI * 2,
+          Math.random() * Math.PI * 2,
+          Math.random() * Math.PI * 2
+        );
+        mesh.userData = {
+          vx: (Math.random() - 0.5) * 0.04,
+          vy: -(0.015 + Math.random() * 0.03),
+          vr: (Math.random() - 0.5) * 0.1,
+          life: 1,
+          decay: 0.003 + Math.random() * 0.004,
+        };
+        threeScene.add(mesh);
+        confettiParticles.push(mesh);
+      }
+    }
+
+    function updateConfetti() {
+      for (let i = confettiParticles.length - 1; i >= 0; i--) {
+        const p = confettiParticles[i];
+        const d = p.userData;
+        p.position.x += d.vx;
+        p.position.y += d.vy;
+        p.rotation.x += d.vr;
+        p.rotation.y += d.vr * 0.7;
+        d.life -= d.decay;
+        p.material.opacity = Math.max(0, d.life);
+        if (d.life <= 0) {
+          threeScene.remove(p);
+          p.geometry.dispose();
+          p.material.dispose();
+          confettiParticles.splice(i, 1);
+        }
+      }
+    }
+
+    // ---- Stars burst ----
+    function spawnStars(count = 12) {
+      for (let i = 0; i < count; i++) {
+        const starShape = new THREE.Shape();
+        const outerR = 0.18;
+        const innerR = 0.08;
+        for (let j = 0; j < 10; j++) {
+          const r = j % 2 === 0 ? outerR : innerR;
+          const angle = (j / 10) * Math.PI * 2 - Math.PI / 2;
+          const x = Math.cos(angle) * r;
+          const y = Math.sin(angle) * r;
+          if (j === 0) starShape.moveTo(x, y);
+          else starShape.lineTo(x, y);
+        }
+        starShape.closePath();
+
+        const geo = new THREE.ShapeGeometry(starShape);
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0xfbbf24,
+          transparent: true,
+          opacity: 1,
+          side: THREE.DoubleSide,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        const angle = (i / count) * Math.PI * 2;
+        const speed = 0.03 + Math.random() * 0.04;
+        mesh.position.set(0, 0, 0);
+        mesh.userData = {
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed + 0.01,
+          vr: (Math.random() - 0.5) * 0.15,
+          life: 1,
+          decay: 0.008 + Math.random() * 0.006,
+        };
+        threeScene.add(mesh);
+        starMeshes.push(mesh);
+      }
+    }
+
+    function updateStars() {
+      for (let i = starMeshes.length - 1; i >= 0; i--) {
+        const s = starMeshes[i];
+        const d = s.userData;
+        s.position.x += d.vx;
+        s.position.y += d.vy;
+        s.rotation.z += d.vr;
+        d.life -= d.decay;
+        s.material.opacity = Math.max(0, d.life);
+        if (d.life <= 0) {
+          threeScene.remove(s);
+          s.geometry.dispose();
+          s.material.dispose();
+          starMeshes.splice(i, 1);
+        }
+      }
+    }
+
+    // ============================
+    //  Detection canvas
+    // ============================
+    function resizeDetectCanvas() {
+      detectCanvas.width = window.innerWidth;
+      detectCanvas.height = window.innerHeight;
+    }
+
+    function drawDetectionOverlay(detections, zone) {
+      const W = detectCanvas.width;
+      const H = detectCanvas.height;
+      detectCtx.clearRect(0, 0, W, H);
+
+      // --- Draw counting zone ---
+      const zx = zone.x * W;
+      const zy = zone.y * H;
+      const zw = zone.w * W;
+      const zh = zone.h * H;
+      const radius = 20;
+      const time = performance.now();
+
+      // Glow fill
+      detectCtx.save();
+      detectCtx.globalAlpha = 0.06 + 0.03 * Math.sin(time / 600);
+      detectCtx.fillStyle = '#4ade80';
+      roundRect(detectCtx, zx, zy, zw, zh, radius);
+      detectCtx.fill();
+      detectCtx.restore();
+
+      // Animated dashed border
+      detectCtx.save();
+      detectCtx.strokeStyle = '#4ade80';
+      detectCtx.lineWidth = 3;
+      detectCtx.globalAlpha = 0.6 + 0.2 * Math.sin(time / 400);
+      detectCtx.setLineDash([14, 10]);
+      detectCtx.lineDashOffset = -(time / 40);
+      roundRect(detectCtx, zx, zy, zw, zh, radius);
+      detectCtx.stroke();
+      detectCtx.restore();
+
+      // Corner highlights
+      drawCorner(detectCtx, zx, zy, 1, 1);
+      drawCorner(detectCtx, zx + zw, zy, -1, 1);
+      drawCorner(detectCtx, zx, zy + zh, 1, -1);
+      drawCorner(detectCtx, zx + zw, zy + zh, -1, -1);
+
+      // Zone label
+      detectCtx.save();
+      detectCtx.font = '600 14px Fredoka, sans-serif';
+      detectCtx.fillStyle = 'rgba(74,222,128,0.8)';
+      detectCtx.textAlign = 'center';
+      detectCtx.fillText('VUNG DEM', zx + zw / 2, zy + 22);
+      detectCtx.restore();
+
+      // --- Draw detected objects ---
+      if (!detections) return;
+      const vw = vision.video.videoWidth || 640;
+      const vh = vision.video.videoHeight || 480;
+
+      // Since video is mirrored, we mirror the x coords
+      const inZone = vision.getObjectsInZone(detections, zone);
+      const inZoneSet = new Set(inZone);
+
+      detections.forEach((det, idx) => {
+        const bb = det.boundingBox;
+        // Map from video coords to screen coords (mirrored)
+        const sx = W - ((bb.originX + bb.width) / vw) * W;
+        const sy = (bb.originY / vh) * H;
+        const sw = (bb.width / vw) * W;
+        const sh = (bb.height / vh) * H;
+
+        const isIn = inZoneSet.has(det);
+        const label = det.categories[0]?.categoryName || '?';
+        const score = det.categories[0]?.score || 0;
+
+        // Bounding box
+        detectCtx.save();
+        detectCtx.strokeStyle = isIn ? '#4ade80' : 'rgba(255,255,255,0.3)';
+        detectCtx.lineWidth = isIn ? 3 : 1.5;
+        detectCtx.globalAlpha = isIn ? 0.9 : 0.5;
+        detectCtx.setLineDash([]);
+        roundRect(detectCtx, sx, sy, sw, sh, 8);
+        detectCtx.stroke();
+        detectCtx.restore();
+
+        // Circle marker at center
+        const cx = sx + sw / 2;
+        const cy = sy + sh / 2;
+        if (isIn) {
+          detectCtx.save();
+          detectCtx.beginPath();
+          detectCtx.arc(cx, cy, 16, 0, Math.PI * 2);
+          detectCtx.fillStyle = 'rgba(74,222,128,0.25)';
+          detectCtx.fill();
+          detectCtx.strokeStyle = '#4ade80';
+          detectCtx.lineWidth = 2;
+          detectCtx.stroke();
+          detectCtx.restore();
+
+          // Index number
+          detectCtx.save();
+          detectCtx.font = 'bold 14px Fredoka, sans-serif';
+          detectCtx.fillStyle = '#4ade80';
+          detectCtx.textAlign = 'center';
+          detectCtx.textBaseline = 'middle';
+          const inIdx = inZone.indexOf(det) + 1;
+          detectCtx.fillText(String(inIdx), cx, cy);
+          detectCtx.restore();
+        }
+
+        // Label
+        detectCtx.save();
+        detectCtx.font = '500 11px Fredoka, sans-serif';
+        detectCtx.fillStyle = isIn ? 'rgba(74,222,128,0.9)' : 'rgba(255,255,255,0.5)';
+        detectCtx.textAlign = 'center';
+        detectCtx.fillText(label, cx, sy + sh + 14);
+        detectCtx.restore();
+      });
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function drawCorner(ctx, x, y, dx, dy) {
+      const len = 22;
+      ctx.save();
+      ctx.strokeStyle = '#4ade80';
+      ctx.lineWidth = 4;
+      ctx.globalAlpha = 0.9;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(x, y + dy * len);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x + dx * len, y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // ============================
+    //  Game logic
+    // ============================
+    function getLevelConfig() {
+      return LEVELS[state.level] || LEVELS[LEVELS.length - 1];
+    }
+
+    function updateUI() {
+      const cfg = getLevelConfig();
+      targetNum.textContent = state.target;
+      targetPrompt.classList.toggle('show', state.phase === 'playing');
+      countDisplay.classList.toggle('show', state.phase === 'playing');
+      levelBadge.style.display = state.phase === 'playing' ? '' : 'none';
+
+      const starIcons = [];
+      for (let i = 0; i < state.stars; i++) starIcons.push('⭐');
+      levelBadge.textContent = cfg.name + ' ' + starIcons.join('');
+    }
+
+    function updateCount(newCount) {
+      if (newCount !== state.prevCount) {
+        state.currentCount = newCount;
+        countValue.textContent = newCount;
+        countValue.classList.remove('bounce');
+        void countValue.offsetWidth; // force reflow
+        countValue.classList.add('bounce');
+
+        // Pop sound when count changes up
+        if (newCount > state.prevCount && state.prevCount >= 0) {
+          audio.playPop();
+        }
+
+        state.prevCount = newCount;
+      }
+
+      if (state.phase !== 'playing') return;
+
+      if (newCount === state.target) {
+        if (state.matchStart === 0) {
+          state.matchStart = performance.now();
+          countValue.style.color = '#fbbf24';
+        } else if (performance.now() - state.matchStart >= state.matchDuration) {
+          onCorrectCount();
+        }
+      } else {
+        state.matchStart = 0;
+        countValue.style.color = newCount > state.target ? '#fb7185' : '#4ade80';
+      }
+    }
+
+    function onCorrectCount() {
+      state.phase = 'celebration';
+      state.stars++;
+      state.totalCorrect++;
+
+      audio.playScore();
+      audio.playWin();
+
+      // 3D celebration
+      spawnConfetti(100);
+      spawnStars(16);
+
+      // UI
+      celebText.textContent = 'Dung roi!';
+      celebSub.textContent = state.target + ' do vat! ⭐';
+      celebration.classList.add('show');
+      targetPrompt.classList.remove('show');
+
+      const cfg = getLevelConfig();
+      setTimeout(() => {
+        celebration.classList.remove('show');
+
+        if (state.target >= cfg.maxTarget) {
+          // Level complete
+          state.level++;
+          if (state.level >= LEVELS.length) {
+            showWinScreen();
+          } else {
+            state.target = 1;
+            state.phase = 'playing';
+            state.matchStart = 0;
+            state.prevCount = -1;
+            createFloatingNumber(state.target);
+            updateUI();
+          }
+        } else {
+          state.target++;
+          state.phase = 'playing';
+          state.matchStart = 0;
+          state.prevCount = -1;
+          createFloatingNumber(state.target);
+          updateUI();
+        }
+      }, 3000);
+    }
+
+    function showWinScreen() {
+      state.phase = 'win';
+      removeFloatingNumber();
+      targetPrompt.classList.remove('show');
+      countDisplay.classList.remove('show');
+      levelBadge.style.display = 'none';
+
+      const totalStars = state.stars;
+      let starStr = '';
+      for (let i = 0; i < Math.min(totalStars, 30); i++) starStr += '⭐';
+      winStars.textContent = starStr;
+      winStats.innerHTML = 'Ban da dem dung <b>' + state.totalCorrect + '</b> lan!<br>So sao: <b>' + totalStars + '</b>';
+      winScreen.classList.add('show');
+
+      audio.playWin();
+      spawnConfetti(150);
+      spawnStars(24);
+    }
+
+    function resetGame() {
+      state.phase = 'playing';
+      state.level = 0;
+      state.target = 1;
+      state.currentCount = 0;
+      state.prevCount = -1;
+      state.matchStart = 0;
+      state.stars = 0;
+      state.totalCorrect = 0;
+      winScreen.classList.remove('show');
+      celebration.classList.remove('show');
+      createFloatingNumber(state.target);
+      updateUI();
+    }
+
+    // ============================
+    //  Init and game loop
+    // ============================
+    async function startGame() {
+      startScreen.classList.add('hidden');
+      loadingScreen.classList.remove('hidden');
+
+      audio.init();
+
+      try {
+        await vision.initObjectDetection({ scoreThreshold: 0.25, maxResults: 20 });
+        const ok = await vision.startCamera();
+        if (!ok) {
+          loadingScreen.querySelector('.loading-text').textContent = 'Khong the bat camera. Vui long cho phep truy cap camera!';
+          return;
+        }
+
+        // Attach camera stream to the visible video element
+        cameraVideo.srcObject = vision.video.srcObject;
+      } catch (err) {
+        console.error('Init error:', err);
+        loadingScreen.querySelector('.loading-text').textContent = 'Loi tai AI: ' + err.message;
+        return;
+      }
+
+      loadingScreen.classList.add('hidden');
+      state.phase = 'playing';
+      createFloatingNumber(state.target);
+      updateUI();
+    }
+
+    function gameLoop(timestamp) {
+      requestAnimationFrame(gameLoop);
+
+      // Run detection at ~15fps
+      if (state.phase === 'playing' || state.phase === 'celebration') {
+        if (vision.ready && timestamp - state.lastDetectionTime > state.detectionInterval) {
+          state.lastDetectionTime = timestamp;
+          const result = vision.detectObjects(timestamp);
+          state.lastDetections = result.detections || [];
+          const zone = getLevelConfig().zone;
+          const inZone = vision.getObjectsInZone(state.lastDetections, zone);
+          updateCount(inZone.length);
+        }
+      }
+
+      // Draw 2D overlay
+      if (state.phase === 'playing' || state.phase === 'celebration') {
+        const zone = getLevelConfig().zone;
+        drawDetectionOverlay(state.lastDetections, zone);
+      }
+
+      // Update Three.js
+      if (floatingNumber) {
+        const t = timestamp / 1000;
+        floatingNumber.position.y = 1.8 + Math.sin(t * 1.5) * 0.15;
+        floatingNumber.material.rotation = Math.sin(t * 0.8) * 0.08;
+      }
+      updateConfetti();
+      updateStars();
+      threeRenderer.render(threeScene, threeCamera);
+    }
+
+    // ============================
+    //  Event listeners
+    // ============================
+    startBtn.addEventListener('click', startGame);
+    replayBtn.addEventListener('click', resetGame);
+
+    // ============================
+    //  Bootstrap
+    // ============================
+    resizeDetectCanvas();
+    initThree();
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>

@@ -1,0 +1,1223 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Khu Vuon Phep Thuat - KidZone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      font-family: 'Fredoka', system-ui, sans-serif;
+      background: #000;
+    }
+
+    #three-canvas {
+      position: fixed; inset: 0; z-index: 0;
+    }
+
+    #ui-overlay {
+      position: fixed; inset: 0; z-index: 10; pointer-events: none;
+    }
+    #ui-overlay > * { pointer-events: auto; }
+
+    /* Back button */
+    #back-btn {
+      position: absolute; top: 16px; left: 16px;
+      background: rgba(0,0,0,0.45); color: #fff; border: none;
+      padding: 10px 20px; border-radius: 16px; font-family: inherit;
+      font-size: 16px; font-weight: 600; cursor: pointer;
+      backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15);
+      text-decoration: none; display: inline-block;
+      transition: background 0.2s;
+    }
+    #back-btn:hover { background: rgba(0,0,0,0.65); }
+
+    /* Prompt banner */
+    #prompt-banner {
+      position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.55); color: #fff;
+      padding: 14px 32px; border-radius: 20px; font-size: clamp(18px, 3vw, 28px);
+      font-weight: 700; text-align: center; white-space: nowrap;
+      backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.12);
+      opacity: 0; transition: opacity 0.4s;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    #prompt-banner.visible { opacity: 1; }
+
+    /* Stats bar */
+    #stats-bar {
+      position: absolute; top: 16px; right: 240px;
+      display: flex; gap: 12px; opacity: 0; transition: opacity 0.4s;
+    }
+    #stats-bar.visible { opacity: 1; }
+    .stat-pill {
+      background: rgba(0,0,0,0.45); color: #fff;
+      padding: 8px 16px; border-radius: 14px; font-size: 15px; font-weight: 600;
+      backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    /* Camera preview */
+    #camera-box {
+      position: absolute; bottom: 16px; right: 16px;
+      width: 220px; height: 165px; border-radius: 16px; overflow: hidden;
+      border: 3px solid rgba(255,255,255,0.25);
+      background: #111; display: none;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    #camera-box.visible { display: block; }
+    #camera-box video {
+      width: 100%; height: 100%; object-fit: cover;
+      transform: scaleX(-1);
+    }
+    #camera-box canvas {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+    }
+
+    /* Count overlay on camera */
+    #count-overlay {
+      position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.7); color: #4ade80; font-size: 18px; font-weight: 700;
+      padding: 4px 14px; border-radius: 10px;
+    }
+
+    /* Start screen */
+    #start-screen {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(160deg, #064e3b 0%, #065f46 30%, #047857 70%, #059669 100%);
+    }
+    #start-screen.hidden { display: none; }
+
+    #start-screen h1 {
+      font-size: clamp(36px, 7vw, 72px); font-weight: 700; color: #fff;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      margin-bottom: 8px;
+    }
+    #start-screen .sub {
+      font-size: clamp(16px, 2.5vw, 24px); color: rgba(255,255,255,0.75);
+      margin-bottom: 40px;
+    }
+
+    #start-btn {
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      color: #1c1917; border: none; padding: 18px 40px;
+      border-radius: 24px; font-family: inherit; font-size: clamp(20px, 3vw, 28px);
+      font-weight: 700; cursor: pointer;
+      box-shadow: 0 8px 30px rgba(251,191,36,0.4);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    #start-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(251,191,36,0.5);
+    }
+
+    .start-deco {
+      font-size: 48px; margin-bottom: 16px;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+
+    #loading-text {
+      color: rgba(255,255,255,0.7); font-size: 18px; margin-top: 20px;
+      display: none;
+    }
+    #loading-text.visible { display: block; }
+
+    .loading-dots::after {
+      content: ''; animation: dots 1.5s steps(4, end) infinite;
+    }
+    @keyframes dots {
+      0% { content: ''; } 25% { content: '.'; }
+      50% { content: '..'; } 75% { content: '...'; }
+    }
+
+    /* Hand sparkle indicator */
+    #hand-indicator {
+      position: fixed; width: 60px; height: 60px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(251,191,36,0.6), transparent);
+      pointer-events: none; z-index: 5; display: none;
+      transform: translate(-50%, -50%);
+      filter: blur(2px);
+    }
+    #hand-indicator.visible { display: block; }
+
+    /* Win overlay */
+    #win-overlay {
+      position: fixed; inset: 0; z-index: 30;
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.3); backdrop-filter: blur(4px);
+    }
+    #win-overlay.visible { display: flex; }
+    #win-overlay h2 {
+      font-size: clamp(32px, 6vw, 64px); color: #fff; font-weight: 700;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.4); margin-bottom: 12px;
+    }
+    #win-overlay .win-sub {
+      font-size: clamp(16px, 2.5vw, 24px); color: rgba(255,255,255,0.8);
+      margin-bottom: 32px;
+    }
+    #win-overlay button {
+      background: linear-gradient(135deg, #34d399, #10b981);
+      color: #fff; border: none; padding: 16px 36px;
+      border-radius: 20px; font-family: inherit; font-size: 22px;
+      font-weight: 700; cursor: pointer;
+      box-shadow: 0 8px 30px rgba(52,211,153,0.4);
+      transition: transform 0.2s;
+    }
+    #win-overlay button:hover { transform: translateY(-3px); }
+  </style>
+</head>
+<body>
+
+<!-- Three.js canvas inserted here by JS -->
+<div id="three-canvas"></div>
+
+<!-- UI Overlay -->
+<div id="ui-overlay">
+  <a href="../index.html" id="back-btn">&#8592; Ve trang chu</a>
+
+  <div id="prompt-banner"></div>
+
+  <div id="stats-bar">
+    <div class="stat-pill" id="plant-count-pill">&#127802; Da trong: 0 cay</div>
+    <div class="stat-pill" id="round-pill">Luot 1</div>
+  </div>
+
+  <div id="camera-box">
+    <canvas id="cam-overlay"></canvas>
+    <div id="count-overlay">Hat giong: 0/0</div>
+  </div>
+</div>
+
+<!-- Hand sparkle -->
+<div id="hand-indicator"></div>
+
+<!-- Start Screen -->
+<div id="start-screen">
+  <div class="start-deco">&#127793;&#127804;&#127803;</div>
+  <h1>Khu Vuon Phep Thuat</h1>
+  <div class="sub">Trong cay, tuoi nuoc, xay khu vuon cua rieng ban!</div>
+  <button id="start-btn">&#127793; BAT DAU TRONG VUON</button>
+  <div id="loading-text" class="loading-dots">Dang tai AI</div>
+</div>
+
+<!-- Win Overlay -->
+<div id="win-overlay">
+  <h2>&#127752; Khu vuon tuyet dep!</h2>
+  <div class="win-sub">Ban da xay mot khu vuon phep thuat tuoi dep!</div>
+  <button id="next-level-btn">&#127793; Tiep tuc</button>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { VisionEngine } from '../engine/vision.js';
+import { AudioSynthesizer } from '../engine/audio.js';
+
+// ─── GLOBALS ──────────────────────────────────────────────
+const vision = new VisionEngine();
+const audio = new AudioSynthesizer();
+
+let scene, camera, renderer, clock;
+let gardenGroup, rainSystem, rainActive = false, rainTimer = 0;
+let sunMesh, sunGlow;
+let allPlants = [];         // Every plant mesh group in the garden
+let butterflies = [];
+let bees = [];
+let clouds = [];
+let rainbowMesh = null;
+
+// Game state
+const STATE = {
+  IDLE: 0, LOADING: 1, PLANTING: 2, WATERING: 3, CELEBRATING: 4, WIN: 5
+};
+let state = STATE.IDLE;
+let currentLevel = 0;       // 0-indexed
+let currentRound = 0;       // 0-indexed within level
+let targetCount = 0;
+let detectedCount = 0;
+let stableFrames = 0;       // Frames where correct count held
+let totalPlants = 0;
+let prevHandLandmarks = null;
+let waveFrames = 0;
+let plantingDone = false;
+let pendingSeedSpots = [];
+let growingPlants = [];      // {mesh, progress, targetScale, phase}
+let bloomingPlants = [];     // Plants currently blooming
+
+// Levels config: [rounds, minCount, maxCount]
+const LEVELS = [
+  { rounds: 5, min: 1, max: 3 },
+  { rounds: 5, min: 2, max: 5 },
+  { rounds: 5, min: 3, max: 7 },
+];
+
+// Detection zone (center 60% of camera)
+const ZONE = { x: 0.15, y: 0.15, w: 0.7, h: 0.7 };
+
+// ─── DOM REFS ─────────────────────────────────────────────
+const startScreen = document.getElementById('start-screen');
+const startBtn = document.getElementById('start-btn');
+const loadingText = document.getElementById('loading-text');
+const promptBanner = document.getElementById('prompt-banner');
+const cameraBox = document.getElementById('camera-box');
+const camOverlay = document.getElementById('cam-overlay');
+const countOverlay = document.getElementById('count-overlay');
+const plantCountPill = document.getElementById('plant-count-pill');
+const roundPill = document.getElementById('round-pill');
+const statsBar = document.getElementById('stats-bar');
+const handIndicator = document.getElementById('hand-indicator');
+const winOverlay = document.getElementById('win-overlay');
+const nextLevelBtn = document.getElementById('next-level-btn');
+
+// ─── THREE.JS SETUP ──────────────────────────────────────
+function initThree() {
+  scene = new THREE.Scene();
+  clock = new THREE.Clock();
+
+  // Camera: slight overhead angle
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 8, 12);
+  camera.lookAt(0, 0, 0);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+  document.getElementById('three-canvas').appendChild(renderer.domElement);
+
+  // Sky gradient background
+  const skyCanvas = document.createElement('canvas');
+  skyCanvas.width = 2; skyCanvas.height = 256;
+  const sCtx = skyCanvas.getContext('2d');
+  const grad = sCtx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, '#87ceeb');
+  grad.addColorStop(0.4, '#b8e4f9');
+  grad.addColorStop(0.7, '#d4f0ff');
+  grad.addColorStop(1, '#f0f9ff');
+  sCtx.fillStyle = grad;
+  sCtx.fillRect(0, 0, 2, 256);
+  const skyTex = new THREE.CanvasTexture(skyCanvas);
+  scene.background = skyTex;
+
+  // Lighting
+  const ambient = new THREE.AmbientLight(0xfff5e6, 0.6);
+  scene.add(ambient);
+
+  const sunLight = new THREE.DirectionalLight(0xfff0d4, 1.2);
+  sunLight.position.set(8, 15, 5);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.width = 1024;
+  sunLight.shadow.mapSize.height = 1024;
+  sunLight.shadow.camera.near = 0.5;
+  sunLight.shadow.camera.far = 40;
+  sunLight.shadow.camera.left = -15;
+  sunLight.shadow.camera.right = 15;
+  sunLight.shadow.camera.top = 15;
+  sunLight.shadow.camera.bottom = -15;
+  scene.add(sunLight);
+
+  const fillLight = new THREE.DirectionalLight(0xd4e8ff, 0.3);
+  fillLight.position.set(-5, 8, -3);
+  scene.add(fillLight);
+
+  // Ground plane
+  const groundGeo = new THREE.PlaneGeometry(30, 30, 32, 32);
+  // Distort ground slightly for natural feel
+  const posArr = groundGeo.attributes.position.array;
+  for (let i = 0; i < posArr.length; i += 3) {
+    posArr[i + 2] += (Math.random() - 0.5) * 0.08;
+  }
+  groundGeo.computeVertexNormals();
+  const groundMat = new THREE.MeshStandardMaterial({
+    color: 0x4ade80,
+    roughness: 0.9,
+    metalness: 0.0,
+  });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Grass tufts
+  for (let i = 0; i < 120; i++) {
+    const blade = new THREE.Mesh(
+      new THREE.ConeGeometry(0.05, 0.2 + Math.random() * 0.15, 4),
+      new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(0.3 + Math.random() * 0.05, 0.7, 0.35 + Math.random() * 0.15) })
+    );
+    blade.position.set(
+      (Math.random() - 0.5) * 24,
+      0.08,
+      (Math.random() - 0.5) * 16
+    );
+    blade.castShadow = true;
+    scene.add(blade);
+  }
+
+  // Garden group (all plants go here)
+  gardenGroup = new THREE.Group();
+  scene.add(gardenGroup);
+
+  // Sun
+  createSun();
+
+  // Clouds
+  for (let i = 0; i < 5; i++) {
+    createCloud(
+      (Math.random() - 0.5) * 30,
+      10 + Math.random() * 4,
+      -8 - Math.random() * 8
+    );
+  }
+
+  // Rain particle system (created but inactive)
+  createRainSystem();
+
+  window.addEventListener('resize', onResize);
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ─── SUN ──────────────────────────────────────────────────
+function createSun() {
+  const sunGeo = new THREE.SphereGeometry(1.5, 24, 24);
+  const sunMat = new THREE.MeshBasicMaterial({ color: 0xfcd34d });
+  sunMesh = new THREE.Mesh(sunGeo, sunMat);
+  sunMesh.position.set(10, 14, -10);
+  scene.add(sunMesh);
+
+  // Glow
+  const glowGeo = new THREE.SphereGeometry(2.2, 24, 24);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xfde68a, transparent: true, opacity: 0.25
+  });
+  sunGlow = new THREE.Mesh(glowGeo, glowMat);
+  sunGlow.position.copy(sunMesh.position);
+  scene.add(sunGlow);
+}
+
+// ─── CLOUDS ───────────────────────────────────────────────
+function createCloud(x, y, z) {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, roughness: 1, metalness: 0,
+    transparent: true, opacity: 0.85,
+  });
+  const puffs = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < puffs; i++) {
+    const r = 0.6 + Math.random() * 0.8;
+    const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 12), mat);
+    puff.position.set(i * 0.9 - puffs * 0.4, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4);
+    group.add(puff);
+  }
+  group.position.set(x, y, z);
+  group.userData = { speed: 0.1 + Math.random() * 0.15 };
+  scene.add(group);
+  clouds.push(group);
+}
+
+// ─── RAIN SYSTEM ──────────────────────────────────────────
+function createRainSystem() {
+  const count = 600;
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+  const velocities = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 20;
+    positions[i * 3 + 1] = Math.random() * 15 + 5;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 14;
+    velocities[i] = 8 + Math.random() * 6;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.userData = { velocities };
+
+  const mat = new THREE.PointsMaterial({
+    color: 0x60a5fa, size: 0.08, transparent: true, opacity: 0.7,
+    sizeAttenuation: true,
+  });
+  rainSystem = new THREE.Points(geo, mat);
+  rainSystem.visible = false;
+  scene.add(rainSystem);
+}
+
+function startRain(duration = 3.5) {
+  rainSystem.visible = true;
+  rainActive = true;
+  rainTimer = duration;
+}
+
+function updateRain(dt) {
+  if (!rainActive) return;
+  rainTimer -= dt;
+  if (rainTimer <= 0) {
+    rainActive = false;
+    rainSystem.visible = false;
+    return;
+  }
+  const pos = rainSystem.geometry.attributes.position.array;
+  const vel = rainSystem.geometry.userData.velocities;
+  for (let i = 0; i < vel.length; i++) {
+    pos[i * 3 + 1] -= vel[i] * dt;
+    pos[i * 3] += (Math.random() - 0.5) * 0.05;
+    if (pos[i * 3 + 1] < 0) {
+      pos[i * 3 + 1] = 12 + Math.random() * 5;
+      pos[i * 3] = (Math.random() - 0.5) * 20;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 14;
+    }
+  }
+  rainSystem.geometry.attributes.position.needsUpdate = true;
+}
+
+// ─── PLANT CREATION ───────────────────────────────────────
+const FLOWER_COLORS = [0xf43f5e, 0xfbbf24, 0xec4899, 0xa855f7, 0xf97316, 0x3b82f6, 0x14b8a6, 0xef4444, 0xe879f9, 0xfb923c];
+
+function getRandomPlantPosition() {
+  // Find a spot on the ground not too close to existing plants
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const x = (Math.random() - 0.5) * 14;
+    const z = (Math.random() - 0.5) * 10 - 1;
+    let tooClose = false;
+    for (const p of allPlants) {
+      const dx = p.position.x - x;
+      const dz = p.position.z - z;
+      if (Math.sqrt(dx * dx + dz * dz) < 1.2) { tooClose = true; break; }
+    }
+    if (!tooClose) return { x, z };
+  }
+  // Fallback: just place it
+  return { x: (Math.random() - 0.5) * 14, z: (Math.random() - 0.5) * 10 - 1 };
+}
+
+function createPlant(x, z) {
+  const group = new THREE.Group();
+  const color = FLOWER_COLORS[Math.floor(Math.random() * FLOWER_COLORS.length)];
+  const stemHeight = 0.8 + Math.random() * 0.6;
+
+  // Stem
+  const stemGeo = new THREE.CylinderGeometry(0.04, 0.06, stemHeight, 8);
+  const stemMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.6 });
+  const stem = new THREE.Mesh(stemGeo, stemMat);
+  stem.position.y = stemHeight / 2;
+  stem.castShadow = true;
+  group.add(stem);
+
+  // Leaves (2 small planes)
+  for (let side = -1; side <= 1; side += 2) {
+    const leafGeo = new THREE.PlaneGeometry(0.25, 0.12);
+    const leafMat = new THREE.MeshStandardMaterial({
+      color: 0x4ade80, roughness: 0.5, side: THREE.DoubleSide,
+    });
+    const leaf = new THREE.Mesh(leafGeo, leafMat);
+    leaf.position.set(side * 0.15, stemHeight * 0.35, 0);
+    leaf.rotation.z = side * 0.6;
+    leaf.rotation.y = Math.random() * Math.PI;
+    group.add(leaf);
+  }
+
+  // Flower head (center)
+  const headRadius = 0.12 + Math.random() * 0.08;
+  const centerGeo = new THREE.SphereGeometry(headRadius, 12, 12);
+  const centerMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.4 });
+  const center = new THREE.Mesh(centerGeo, centerMat);
+  center.position.y = stemHeight + headRadius * 0.5;
+  group.add(center);
+
+  // Petals (arranged in circle)
+  const petalCount = 5 + Math.floor(Math.random() * 4);
+  const petalsGroup = new THREE.Group();
+  petalsGroup.position.y = stemHeight + headRadius * 0.3;
+  for (let i = 0; i < petalCount; i++) {
+    const angle = (i / petalCount) * Math.PI * 2;
+    const petalGeo = new THREE.SphereGeometry(0.1 + Math.random() * 0.05, 8, 6);
+    petalGeo.scale(1, 0.4, 1.5);
+    const petalMat = new THREE.MeshStandardMaterial({ color, roughness: 0.3 });
+    const petal = new THREE.Mesh(petalGeo, petalMat);
+    petal.position.set(
+      Math.cos(angle) * (headRadius + 0.06),
+      0,
+      Math.sin(angle) * (headRadius + 0.06)
+    );
+    petal.lookAt(petalsGroup.position.clone().add(new THREE.Vector3(0, 0.5, 0)));
+    petalsGroup.add(petal);
+  }
+  group.add(petalsGroup);
+
+  // Store references for animation
+  group.userData = {
+    stemHeight,
+    petalsGroup,
+    center,
+    color,
+    swayOffset: Math.random() * Math.PI * 2,
+    swaySpeed: 0.5 + Math.random() * 0.5,
+    bloomed: false,
+    bloomProgress: 0,
+  };
+
+  group.position.set(x, 0, z);
+  group.scale.set(0, 0, 0); // Start invisible for growth animation
+
+  gardenGroup.add(group);
+  allPlants.push(group);
+  return group;
+}
+
+// Seed spot marker
+function createSeedSpot(x, z) {
+  const geo = new THREE.CylinderGeometry(0.15, 0.15, 0.05, 16);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 });
+  const spot = new THREE.Mesh(geo, mat);
+  spot.position.set(x, 0.03, z);
+  gardenGroup.add(spot);
+  return spot;
+}
+
+// ─── BUTTERFLY ────────────────────────────────────────────
+function createButterfly() {
+  const group = new THREE.Group();
+  const color = FLOWER_COLORS[Math.floor(Math.random() * FLOWER_COLORS.length)];
+
+  // Body
+  const bodyGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.15, 6);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.rotation.z = Math.PI / 2;
+  group.add(body);
+
+  // Wings
+  for (let side = -1; side <= 1; side += 2) {
+    const wingGeo = new THREE.PlaneGeometry(0.18, 0.12);
+    const wingMat = new THREE.MeshStandardMaterial({
+      color, side: THREE.DoubleSide, transparent: true, opacity: 0.85, roughness: 0.3,
+    });
+    const wing = new THREE.Mesh(wingGeo, wingMat);
+    wing.position.set(0, side * 0.06, 0);
+    wing.rotation.x = side * 0.3;
+    wing.userData.side = side;
+    group.add(wing);
+  }
+
+  // Random position near a plant or random
+  let tx, tz;
+  if (allPlants.length > 0) {
+    const p = allPlants[Math.floor(Math.random() * allPlants.length)];
+    tx = p.position.x + (Math.random() - 0.5) * 3;
+    tz = p.position.z + (Math.random() - 0.5) * 3;
+  } else {
+    tx = (Math.random() - 0.5) * 10;
+    tz = (Math.random() - 0.5) * 8;
+  }
+  group.position.set(tx, 1.5 + Math.random() * 1.5, tz);
+  group.userData = {
+    phase: Math.random() * Math.PI * 2,
+    speed: 1 + Math.random(),
+    radiusX: 1 + Math.random() * 2,
+    radiusZ: 1 + Math.random() * 2,
+    baseX: tx,
+    baseZ: tz,
+    baseY: group.position.y,
+    flapSpeed: 6 + Math.random() * 4,
+  };
+
+  scene.add(group);
+  butterflies.push(group);
+}
+
+// ─── BEE ──────────────────────────────────────────────────
+function createBee() {
+  const group = new THREE.Group();
+
+  // Body
+  const bodyGeo = new THREE.SphereGeometry(0.08, 10, 10);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24 });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  group.add(body);
+
+  // Stripes
+  const stripeGeo = new THREE.TorusGeometry(0.082, 0.015, 8, 16);
+  const stripeMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+  for (let i = -1; i <= 1; i += 2) {
+    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+    stripe.position.y = i * 0.03;
+    stripe.rotation.x = Math.PI / 2;
+    group.add(stripe);
+  }
+
+  // Wings
+  for (let side = -1; side <= 1; side += 2) {
+    const wingGeo = new THREE.PlaneGeometry(0.1, 0.06);
+    const wingMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5,
+    });
+    const wing = new THREE.Mesh(wingGeo, wingMat);
+    wing.position.set(side * 0.06, 0.06, 0);
+    wing.rotation.z = side * 0.5;
+    wing.userData.side = side;
+    group.add(wing);
+  }
+
+  let bx, bz;
+  if (allPlants.length > 0) {
+    const p = allPlants[Math.floor(Math.random() * allPlants.length)];
+    bx = p.position.x + (Math.random() - 0.5) * 2;
+    bz = p.position.z + (Math.random() - 0.5) * 2;
+  } else {
+    bx = (Math.random() - 0.5) * 8;
+    bz = (Math.random() - 0.5) * 6;
+  }
+  group.position.set(bx, 1 + Math.random() * 1.2, bz);
+  group.userData = {
+    phase: Math.random() * Math.PI * 2,
+    speed: 1.5 + Math.random() * 1.5,
+    radius: 0.5 + Math.random() * 1.5,
+    baseX: bx, baseZ: bz, baseY: group.position.y,
+    buzzSpeed: 15 + Math.random() * 10,
+  };
+
+  scene.add(group);
+  bees.push(group);
+}
+
+// ─── RAINBOW ──────────────────────────────────────────────
+function createRainbow() {
+  if (rainbowMesh) return;
+  const curve = new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(-10, 0, -5),
+    new THREE.Vector3(0, 12, -5),
+    new THREE.Vector3(10, 0, -5)
+  );
+  const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.5, 8, false);
+
+  // Rainbow colors via vertex colors
+  const colors = [];
+  const rainbowHues = [0, 0.05, 0.1, 0.15, 0.3, 0.55, 0.7];
+  const posAttr = tubeGeo.attributes.position;
+  for (let i = 0; i < posAttr.count; i++) {
+    const t = i / posAttr.count;
+    const hueIdx = Math.floor(t * rainbowHues.length) % rainbowHues.length;
+    const c = new THREE.Color().setHSL(rainbowHues[hueIdx], 0.8, 0.6);
+    colors.push(c.r, c.g, c.b);
+  }
+  tubeGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+  const mat = new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.5, side: THREE.DoubleSide,
+  });
+  rainbowMesh = new THREE.Mesh(tubeGeo, mat);
+  rainbowMesh.scale.set(0, 0, 0);
+  scene.add(rainbowMesh);
+
+  // Animate rainbow appearing
+  const target = { s: 0 };
+  animateValue(target, 's', 1, 2000, (v) => {
+    if (rainbowMesh) rainbowMesh.scale.set(v, v, v);
+  });
+}
+
+// ─── ANIMATION HELPERS ────────────────────────────────────
+function easeOutBounce(x) {
+  const n1 = 7.5625; const d1 = 2.75;
+  if (x < 1 / d1) return n1 * x * x;
+  else if (x < 2 / d1) return n1 * (x -= 1.5 / d1) * x + 0.75;
+  else if (x < 2.5 / d1) return n1 * (x -= 2.25 / d1) * x + 0.9375;
+  else return n1 * (x -= 2.625 / d1) * x + 0.984375;
+}
+
+function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+
+function animateValue(obj, key, target, duration, onUpdate) {
+  const start = obj[key];
+  const startTime = performance.now();
+  function tick() {
+    const elapsed = performance.now() - startTime;
+    const t = Math.min(elapsed / duration, 1);
+    const eased = easeOutCubic(t);
+    obj[key] = start + (target - start) * eased;
+    if (onUpdate) onUpdate(obj[key]);
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+// ─── PLANT GROWTH ANIMATION ──────────────────────────────
+function startGrowingPlant(plant, delay = 0) {
+  setTimeout(() => {
+    growingPlants.push({
+      mesh: plant,
+      progress: 0,
+      duration: 2500,
+      startTime: performance.now(),
+    });
+    audio.playPop();
+  }, delay);
+}
+
+function updateGrowingPlants() {
+  const now = performance.now();
+  for (let i = growingPlants.length - 1; i >= 0; i--) {
+    const g = growingPlants[i];
+    const elapsed = now - g.startTime;
+    const t = Math.min(elapsed / g.duration, 1);
+    const s = easeOutBounce(t);
+    g.mesh.scale.set(s, s, s);
+    if (t >= 1) {
+      growingPlants.splice(i, 1);
+    }
+  }
+}
+
+// ─── BLOOM ANIMATION ─────────────────────────────────────
+function bloomPlant(plant) {
+  if (plant.userData.bloomed) return;
+  plant.userData.bloomed = true;
+  bloomingPlants.push({
+    mesh: plant,
+    startTime: performance.now(),
+    duration: 1500,
+  });
+}
+
+function updateBloomingPlants() {
+  const now = performance.now();
+  for (let i = bloomingPlants.length - 1; i >= 0; i--) {
+    const b = bloomingPlants[i];
+    const t = Math.min((now - b.startTime) / b.duration, 1);
+    const s = 1 + easeOutCubic(t) * 0.4;
+    if (b.mesh.userData.petalsGroup) {
+      b.mesh.userData.petalsGroup.scale.set(s, s, s);
+    }
+    b.mesh.userData.bloomProgress = t;
+    if (t >= 1) {
+      bloomingPlants.splice(i, 1);
+    }
+  }
+}
+
+// ─── SCENE ANIMATION LOOP ────────────────────────────────
+function updateScene(dt, elapsed) {
+  // Sway plants
+  for (const p of allPlants) {
+    if (p.scale.x < 0.01) continue;
+    const ud = p.userData;
+    p.rotation.z = Math.sin(elapsed * ud.swaySpeed + ud.swayOffset) * 0.04;
+    p.rotation.x = Math.cos(elapsed * ud.swaySpeed * 0.7 + ud.swayOffset) * 0.02;
+  }
+
+  // Butterflies
+  for (const bf of butterflies) {
+    const ud = bf.userData;
+    ud.phase += dt * ud.speed;
+    bf.position.x = ud.baseX + Math.sin(ud.phase) * ud.radiusX;
+    bf.position.z = ud.baseZ + Math.cos(ud.phase * 0.7) * ud.radiusZ;
+    bf.position.y = ud.baseY + Math.sin(ud.phase * 1.3) * 0.3;
+    // Flap wings
+    bf.children.forEach(c => {
+      if (c.userData.side !== undefined) {
+        c.rotation.x = c.userData.side * Math.sin(elapsed * ud.flapSpeed) * 0.8;
+      }
+    });
+    // Face direction of travel
+    bf.rotation.y = ud.phase;
+  }
+
+  // Bees
+  for (const b of bees) {
+    const ud = b.userData;
+    ud.phase += dt * ud.speed;
+    b.position.x = ud.baseX + Math.sin(ud.phase) * ud.radius;
+    b.position.z = ud.baseZ + Math.cos(ud.phase) * ud.radius;
+    b.position.y = ud.baseY + Math.sin(elapsed * 3) * 0.15;
+    // Buzz wings
+    b.children.forEach(c => {
+      if (c.userData.side !== undefined) {
+        c.rotation.z = c.userData.side * (0.5 + Math.sin(elapsed * ud.buzzSpeed) * 0.4);
+      }
+    });
+  }
+
+  // Clouds drift
+  for (const c of clouds) {
+    c.position.x += c.userData.speed * dt;
+    if (c.position.x > 20) c.position.x = -20;
+  }
+
+  // Sun glow pulse
+  if (sunGlow) {
+    sunGlow.material.opacity = 0.2 + Math.sin(elapsed * 0.5) * 0.08;
+    sunGlow.scale.setScalar(1 + Math.sin(elapsed * 0.3) * 0.05);
+  }
+
+  // Growing plants
+  updateGrowingPlants();
+  updateBloomingPlants();
+
+  // Rain
+  updateRain(dt);
+}
+
+// ─── CAMERA OVERLAY DRAWING ──────────────────────────────
+function drawCamOverlay(detections) {
+  const canvas = camOverlay;
+  const ctx = canvas.getContext('2d');
+  const box = cameraBox.getBoundingClientRect();
+  canvas.width = box.width;
+  canvas.height = box.height;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw detection zone
+  ctx.strokeStyle = 'rgba(74, 222, 128, 0.6)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  // Mirror the zone since video is flipped
+  ctx.strokeRect(
+    (1 - ZONE.x - ZONE.w) * canvas.width,
+    ZONE.y * canvas.height,
+    ZONE.w * canvas.width,
+    ZONE.h * canvas.height
+  );
+  ctx.setLineDash([]);
+
+  // Draw detection boxes
+  if (detections) {
+    const vw = vision.video.videoWidth || 640;
+    const vh = vision.video.videoHeight || 480;
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2;
+    for (const d of detections) {
+      const bb = d.boundingBox;
+      // Mirror horizontally
+      const rx = (1 - (bb.originX + bb.width) / vw) * canvas.width;
+      const ry = (bb.originY / vh) * canvas.height;
+      const rw = (bb.width / vw) * canvas.width;
+      const rh = (bb.height / vh) * canvas.height;
+      ctx.strokeRect(rx, ry, rw, rh);
+    }
+  }
+}
+
+// ─── GAME LOGIC ───────────────────────────────────────────
+function showPrompt(text) {
+  promptBanner.textContent = text;
+  promptBanner.classList.add('visible');
+}
+function hidePrompt() {
+  promptBanner.classList.remove('visible');
+}
+
+function updateStats() {
+  plantCountPill.textContent = `\u{1F33A} Da trong: ${totalPlants} cay`;
+  roundPill.textContent = `Luot ${currentRound + 1}`;
+}
+
+function getTargetForRound() {
+  const lvl = LEVELS[currentLevel] || LEVELS[LEVELS.length - 1];
+  return lvl.min + Math.floor(Math.random() * (lvl.max - lvl.min + 1));
+}
+
+async function startGame() {
+  startBtn.disabled = true;
+  loadingText.classList.add('visible');
+
+  try {
+    await Promise.all([
+      vision.initObjectDetection({ scoreThreshold: 0.25, maxResults: 20 }),
+      vision.initHandTracking({ numHands: 2 }),
+    ]);
+    await vision.startCamera();
+  } catch (e) {
+    loadingText.textContent = 'Khong the tai AI hoac bat camera. Hay thu lai!';
+    startBtn.disabled = false;
+    console.error(e);
+    return;
+  }
+
+  // Attach video to camera preview
+  cameraBox.insertBefore(vision.video, cameraBox.firstChild);
+  audio.init();
+
+  startScreen.classList.add('hidden');
+  cameraBox.classList.add('visible');
+  statsBar.classList.add('visible');
+
+  currentLevel = 0;
+  currentRound = 0;
+  totalPlants = 0;
+  updateStats();
+  beginPlantingPhase();
+}
+
+function beginPlantingPhase() {
+  state = STATE.PLANTING;
+  targetCount = getTargetForRound();
+  detectedCount = 0;
+  stableFrames = 0;
+  plantingDone = false;
+  pendingSeedSpots = [];
+
+  updateStats();
+  countOverlay.textContent = `Hat giong: 0/${targetCount}`;
+  showPrompt(`Trong ${targetCount} hat giong! (Dat ${targetCount} do vat)`);
+}
+
+function onPlantingSuccess() {
+  plantingDone = true;
+  audio.playCorrect();
+  hidePrompt();
+
+  // Place seed spots then grow
+  const spots = [];
+  const plants = [];
+  for (let i = 0; i < targetCount; i++) {
+    const pos = getRandomPlantPosition();
+    const spot = createSeedSpot(pos.x, pos.z);
+    spots.push(spot);
+    const plant = createPlant(pos.x, pos.z);
+    plants.push(plant);
+    totalPlants++;
+  }
+  updateStats();
+  audio.playScore();
+
+  // Remove seed spots after a moment, then grow plants
+  setTimeout(() => {
+    for (const s of spots) {
+      gardenGroup.remove(s);
+      s.geometry.dispose();
+      s.material.dispose();
+    }
+    for (let i = 0; i < plants.length; i++) {
+      startGrowingPlant(plants[i], i * 400);
+    }
+  }, 800);
+
+  // After growth finishes, move to watering phase
+  const growDuration = 800 + targetCount * 400 + 2500 + 300;
+  setTimeout(() => {
+    beginWateringPhase(plants);
+  }, growDuration);
+}
+
+function beginWateringPhase(plantsToBloom) {
+  state = STATE.WATERING;
+  waveFrames = 0;
+  prevHandLandmarks = null;
+  showPrompt('Vay tay de tuoi nuoc! \u{1F4A7}');
+
+  // Store which plants to bloom
+  pendingSeedSpots = plantsToBloom;
+}
+
+function onWateringSuccess() {
+  state = STATE.CELEBRATING;
+  hidePrompt();
+  audio.playScore();
+
+  // Start rain
+  startRain(3.5);
+
+  // Play rain sound repeatedly
+  let rainSfxCount = 0;
+  const rainSfx = setInterval(() => {
+    audio.playPop();
+    rainSfxCount++;
+    if (rainSfxCount > 8) clearInterval(rainSfx);
+  }, 400);
+
+  // Bloom the plants from this round
+  for (const p of pendingSeedSpots) {
+    bloomPlant(p);
+  }
+
+  // Add some butterflies and bees
+  const numBf = 1 + Math.floor(Math.random() * 2);
+  const numBee = Math.random() > 0.5 ? 1 : 0;
+  for (let i = 0; i < numBf; i++) createButterfly();
+  for (let i = 0; i < numBee; i++) createBee();
+
+  // After celebration, go to next round or win
+  setTimeout(() => {
+    const lvl = LEVELS[currentLevel] || LEVELS[LEVELS.length - 1];
+    currentRound++;
+    if (currentRound >= lvl.rounds) {
+      onLevelComplete();
+    } else {
+      beginPlantingPhase();
+    }
+  }, 4500);
+}
+
+function onLevelComplete() {
+  state = STATE.WIN;
+  audio.playWin();
+
+  // Create rainbow on level complete
+  createRainbow();
+
+  // Add a burst of butterflies
+  for (let i = 0; i < 3; i++) createButterfly();
+  for (let i = 0; i < 2; i++) createBee();
+
+  showPrompt('');
+  winOverlay.classList.add('visible');
+}
+
+function startNextLevel() {
+  winOverlay.classList.remove('visible');
+
+  currentLevel++;
+  currentRound = 0;
+
+  // If past all levels, reset garden and go back to level 0 with different theme
+  if (currentLevel >= LEVELS.length) {
+    currentLevel = 0;
+    resetGarden();
+  }
+
+  // Remove rainbow
+  if (rainbowMesh) {
+    scene.remove(rainbowMesh);
+    rainbowMesh.geometry.dispose();
+    rainbowMesh.material.dispose();
+    rainbowMesh = null;
+  }
+
+  updateStats();
+  beginPlantingPhase();
+}
+
+function resetGarden() {
+  // Remove all plants
+  for (const p of allPlants) {
+    gardenGroup.remove(p);
+    p.traverse(c => {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) c.material.dispose();
+    });
+  }
+  allPlants = [];
+
+  // Remove butterflies
+  for (const bf of butterflies) {
+    scene.remove(bf);
+    bf.traverse(c => {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) c.material.dispose();
+    });
+  }
+  butterflies = [];
+
+  // Remove bees
+  for (const b of bees) {
+    scene.remove(b);
+    b.traverse(c => {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) c.material.dispose();
+    });
+  }
+  bees = [];
+
+  totalPlants = 0;
+  growingPlants = [];
+  bloomingPlants = [];
+}
+
+// ─── DETECTION LOOP ───────────────────────────────────────
+let lastDetectionTime = 0;
+const DETECT_INTERVAL = 200; // ms between detections
+
+function runDetection(timestamp) {
+  if (timestamp - lastDetectionTime < DETECT_INTERVAL) return;
+  if (!vision.ready) return;
+  lastDetectionTime = timestamp;
+
+  if (state === STATE.PLANTING && !plantingDone) {
+    const result = vision.detectObjects(timestamp);
+    const inZone = vision.getObjectsInZone(result.detections, ZONE);
+    detectedCount = inZone.length;
+    countOverlay.textContent = `Hat giong: ${detectedCount}/${targetCount}`;
+    drawCamOverlay(inZone);
+
+    if (detectedCount >= targetCount) {
+      stableFrames++;
+      if (stableFrames >= 6) { // ~1.2 seconds stable
+        onPlantingSuccess();
+      }
+    } else {
+      stableFrames = Math.max(0, stableFrames - 1);
+    }
+  }
+
+  if (state === STATE.WATERING) {
+    const hands = vision.detectHands(timestamp);
+    drawCamOverlay(null);
+
+    if (hands.landmarks && hands.landmarks.length > 0) {
+      // Show hand indicator on 3D scene
+      const center = vision.getHandCenter(hands.landmarks);
+      if (center) {
+        handIndicator.classList.add('visible');
+        handIndicator.style.left = ((1 - center.x) * window.innerWidth) + 'px';
+        handIndicator.style.top = (center.y * window.innerHeight) + 'px';
+      }
+
+      // Check for waving
+      if (prevHandLandmarks) {
+        const waving = vision.isWaving(hands.landmarks, prevHandLandmarks);
+        if (waving) {
+          waveFrames++;
+          if (waveFrames >= 5) { // ~1 second of waving
+            handIndicator.classList.remove('visible');
+            onWateringSuccess();
+          }
+        }
+      }
+      prevHandLandmarks = hands.landmarks.map(h => h.map(p => ({ ...p })));
+    } else {
+      handIndicator.classList.remove('visible');
+      prevHandLandmarks = null;
+    }
+  }
+}
+
+// ─── MAIN LOOP ────────────────────────────────────────────
+function mainLoop(timestamp) {
+  requestAnimationFrame(mainLoop);
+
+  const dt = clock.getDelta();
+  const elapsed = clock.elapsedTime;
+
+  updateScene(dt, elapsed);
+  runDetection(timestamp || performance.now());
+  renderer.render(scene, camera);
+}
+
+// ─── INIT ─────────────────────────────────────────────────
+initThree();
+requestAnimationFrame(mainLoop);
+
+startBtn.addEventListener('click', startGame);
+nextLevelBtn.addEventListener('click', startNextLevel);
+</script>
+</body>
+</html>

@@ -1,0 +1,1358 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Phu Thuy Pha Che - KidZone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      font-family: 'Fredoka', system-ui, sans-serif;
+      background: #0a0015;
+    }
+
+    /* --- Layers --- */
+    #videoEl {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; z-index: 0; transform: scaleX(-1);
+    }
+    #mysticalOverlay {
+      position: fixed; inset: 0; z-index: 1;
+      background: radial-gradient(ellipse at 50% 100%, rgba(60,10,90,0.35) 0%, rgba(10,0,30,0.25) 50%, transparent 100%);
+      pointer-events: none;
+    }
+    #overlayCanvas {
+      position: fixed; inset: 0; width: 100%; height: 100%; z-index: 2;
+      pointer-events: none;
+    }
+    #threeCanvas {
+      position: fixed; inset: 0; width: 100%; height: 100%; z-index: 3;
+      pointer-events: none;
+    }
+    #uiLayer {
+      position: fixed; inset: 0; z-index: 4;
+      display: flex; flex-direction: column; align-items: center;
+      pointer-events: none;
+    }
+    #uiLayer > * { pointer-events: auto; }
+
+    /* --- Start Screen --- */
+    #startScreen {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 50% 40%, #1c0a3e 0%, #0a0018 100%);
+    }
+    #startScreen.hidden { display: none; }
+
+    .start-title {
+      font-size: clamp(36px, 8vw, 72px); font-weight: 700;
+      background: linear-gradient(135deg, #a855f7 0%, #ec4899 40%, #fbbf24 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      text-align: center; line-height: 1.1; margin-bottom: 8px;
+    }
+    .start-subtitle {
+      font-size: clamp(14px, 2.5vw, 22px); color: rgba(255,255,255,0.5);
+      margin-bottom: 48px; text-align: center;
+    }
+    .start-cauldron {
+      font-size: 100px; margin-bottom: 32px;
+      animation: startFloat 3s ease-in-out infinite;
+    }
+    @keyframes startFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-16px); }
+    }
+    #startBtn {
+      font-family: 'Fredoka', sans-serif; font-size: 24px; font-weight: 700;
+      padding: 18px 48px; border: none; border-radius: 999px; cursor: pointer;
+      background: linear-gradient(135deg, #a855f7, #7c3aed);
+      color: white; box-shadow: 0 0 40px rgba(168,85,247,0.5);
+      transition: all 0.3s; letter-spacing: 0.5px;
+    }
+    #startBtn:hover { transform: scale(1.08); box-shadow: 0 0 60px rgba(168,85,247,0.7); }
+
+    .start-sparkles {
+      position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+    }
+    .start-sparkles span {
+      position: absolute; width: 3px; height: 3px; border-radius: 50%;
+      background: #c084fc; animation: sparkDrift linear infinite;
+    }
+    @keyframes sparkDrift {
+      0% { transform: translateY(100vh) scale(0); opacity: 0; }
+      10% { opacity: 1; transform: translateY(90vh) scale(1); }
+      90% { opacity: 0.6; }
+      100% { transform: translateY(-10vh) scale(0.3); opacity: 0; }
+    }
+
+    /* --- Loading --- */
+    #loadingMsg {
+      position: fixed; inset: 0; z-index: 99;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(10,0,24,0.95); color: #c084fc;
+      font-size: 22px; font-weight: 600;
+    }
+    #loadingMsg.hidden { display: none; }
+    .loading-spinner {
+      width: 48px; height: 48px; border: 4px solid rgba(168,85,247,0.2);
+      border-top-color: #a855f7; border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin-bottom: 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* --- Back Button --- */
+    #backBtn {
+      position: fixed; top: 16px; left: 16px; z-index: 50;
+      font-family: 'Fredoka', sans-serif; font-size: 15px; font-weight: 600;
+      color: rgba(255,255,255,0.7); text-decoration: none;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+      padding: 8px 18px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.15);
+      transition: all 0.2s;
+    }
+    #backBtn:hover { background: rgba(0,0,0,0.7); color: white; }
+
+    /* --- Level Indicator --- */
+    #levelBadge {
+      position: fixed; top: 16px; right: 16px; z-index: 50;
+      font-family: 'Fredoka', sans-serif; font-size: 15px; font-weight: 700;
+      color: #fbbf24; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+      padding: 8px 18px; border-radius: 999px;
+      border: 1px solid rgba(251,191,36,0.3);
+    }
+
+    /* --- Recipe Card --- */
+    #recipeCard {
+      margin-top: 16px; padding: 18px 28px 14px;
+      background: linear-gradient(135deg, rgba(30,5,60,0.88), rgba(15,2,35,0.92));
+      backdrop-filter: blur(12px);
+      border: 2px solid rgba(168,85,247,0.4);
+      border-radius: 20px; text-align: center;
+      box-shadow: 0 0 30px rgba(120,50,200,0.25), inset 0 0 30px rgba(168,85,247,0.05);
+      min-width: 280px; max-width: 90vw;
+      transition: all 0.4s;
+    }
+    #recipeCard.hidden { display: none; }
+    .recipe-label {
+      font-size: 13px; font-weight: 600; color: #c084fc;
+      text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px;
+    }
+    .recipe-ornament {
+      font-size: 10px; color: rgba(168,85,247,0.5); margin-bottom: 8px; letter-spacing: 4px;
+    }
+    .recipe-text {
+      font-size: clamp(18px, 3vw, 26px); font-weight: 700; color: #fff;
+      margin-bottom: 10px; line-height: 1.4;
+    }
+    .recipe-colors {
+      display: flex; gap: 16px; justify-content: center; align-items: center;
+      flex-wrap: wrap; margin-bottom: 8px;
+    }
+    .recipe-color-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 14px; border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: all 0.3s;
+    }
+    .recipe-color-item.fulfilled {
+      background: rgba(34,197,94,0.2);
+      border-color: rgba(34,197,94,0.6);
+      box-shadow: 0 0 12px rgba(34,197,94,0.3);
+    }
+    .color-dot {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    .color-count {
+      font-size: 16px; font-weight: 700; color: #fff;
+    }
+
+    /* --- Progress --- */
+    #progressBar {
+      margin-top: 10px; padding: 8px 20px;
+      background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
+      border-radius: 999px; font-size: 15px; font-weight: 600;
+      color: rgba(255,255,255,0.8);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    #progressBar.hidden { display: none; }
+
+    /* --- Creature Popup --- */
+    #creaturePopup {
+      position: fixed; inset: 0; z-index: 60;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 50% 50%, rgba(100,30,180,0.6), rgba(10,0,24,0.7));
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.5s;
+    }
+    #creaturePopup.visible { opacity: 1; pointer-events: auto; }
+    .creature-emoji {
+      font-size: clamp(80px, 18vw, 140px);
+      animation: creatureBounce 0.8s ease-out;
+    }
+    @keyframes creatureBounce {
+      0% { transform: scale(0) translateY(100px); opacity: 0; }
+      50% { transform: scale(1.3) translateY(-20px); }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    .creature-name {
+      font-size: clamp(22px, 5vw, 38px); font-weight: 700;
+      background: linear-gradient(135deg, #fbbf24, #f97316, #ec4899);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-top: 12px; text-align: center;
+    }
+    .creature-subtitle {
+      font-size: 16px; color: rgba(255,255,255,0.6); margin-top: 6px;
+    }
+
+    /* --- Collection --- */
+    #collectionBar {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+      display: flex; align-items: center; justify-content: center;
+      gap: 6px; padding: 10px 16px;
+      background: linear-gradient(to top, rgba(10,0,24,0.85), transparent);
+      pointer-events: none;
+    }
+    #collectionBar.hidden { display: none; }
+    .collected-creature {
+      font-size: 32px; opacity: 0.9;
+      animation: collectPop 0.4s ease-out backwards;
+    }
+    @keyframes collectPop {
+      0% { transform: scale(0); }
+      100% { transform: scale(1); }
+    }
+
+    /* --- Win Screen --- */
+    #winScreen {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 50% 40%, #1c0a3e 0%, #0a0018 100%);
+    }
+    #winScreen.hidden { display: none; }
+    .win-title {
+      font-size: clamp(32px, 7vw, 64px); font-weight: 700;
+      background: linear-gradient(135deg, #fbbf24 0%, #f97316 30%, #ec4899 60%, #a855f7 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      text-align: center; margin-bottom: 24px;
+    }
+    .win-collection {
+      display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+      margin-bottom: 32px;
+    }
+    .win-creature {
+      font-size: 48px;
+      animation: winFloat 3s ease-in-out infinite backwards;
+    }
+    #playAgainBtn {
+      font-family: 'Fredoka', sans-serif; font-size: 20px; font-weight: 700;
+      padding: 14px 40px; border: none; border-radius: 999px; cursor: pointer;
+      background: linear-gradient(135deg, #a855f7, #ec4899);
+      color: white; box-shadow: 0 0 30px rgba(168,85,247,0.4);
+      transition: all 0.3s;
+    }
+    #playAgainBtn:hover { transform: scale(1.05); }
+    @keyframes winFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    /* --- Detection markers on overlay canvas --- */
+    .det-marker {
+      position: absolute; border: 2px solid; border-radius: 8px;
+      pointer-events: none; z-index: 5;
+      transition: all 0.15s;
+    }
+    .det-label {
+      position: absolute; top: -22px; left: 0;
+      font-family: 'Fredoka', sans-serif; font-size: 12px; font-weight: 700;
+      padding: 1px 8px; border-radius: 6px; white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Camera Background -->
+  <video id="videoEl" playsinline autoplay muted></video>
+  <div id="mysticalOverlay"></div>
+
+  <!-- 2D Overlay for detection markers -->
+  <canvas id="overlayCanvas"></canvas>
+
+  <!-- Three.js Canvas (injected by script) -->
+
+  <!-- UI Layer -->
+  <div id="uiLayer">
+    <div id="recipeCard" class="hidden">
+      <div class="recipe-ornament">~ ~ ~</div>
+      <div class="recipe-label">Cong thuc phep thuat</div>
+      <div class="recipe-text" id="recipeText"></div>
+      <div class="recipe-colors" id="recipeColors"></div>
+      <div class="recipe-ornament">~ ~ ~</div>
+    </div>
+    <div id="progressBar" class="hidden"></div>
+  </div>
+
+  <a id="backBtn" href="../index.html">&#8592; Ve trang chu</a>
+  <div id="levelBadge">Cap 1</div>
+
+  <!-- Collection Bar -->
+  <div id="collectionBar" class="hidden"></div>
+
+  <!-- Start Screen -->
+  <div id="startScreen">
+    <div class="start-sparkles" id="startSparkles"></div>
+    <div class="start-cauldron">&#x1F9D9;</div>
+    <div class="start-title">Phu Thuy Pha Che</div>
+    <div class="start-subtitle">Pha che thuoc phep bang mau sac that!</div>
+    <button id="startBtn">&#x1F9D9; BAT DAU PHA CHE</button>
+  </div>
+
+  <!-- Loading -->
+  <div id="loadingMsg" class="hidden">
+    <div class="loading-spinner"></div>
+    Dang trieu hoi AI...
+  </div>
+
+  <!-- Creature Popup -->
+  <div id="creaturePopup">
+    <div class="creature-emoji" id="creatureEmoji"></div>
+    <div class="creature-name" id="creatureName"></div>
+    <div class="creature-subtitle">da xuat hien!</div>
+  </div>
+
+  <!-- Win Screen -->
+  <div id="winScreen" class="hidden">
+    <div class="start-sparkles" id="winSparkles"></div>
+    <div class="win-title">Phu thuy gioi nhat!</div>
+    <div class="win-collection" id="winCollection"></div>
+    <button id="playAgainBtn">Choi lai</button>
+  </div>
+
+  <!-- Detection Marker Container -->
+  <div id="markerContainer" style="position:fixed;inset:0;z-index:5;pointer-events:none;"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { VisionEngine } from '../engine/vision.js';
+    import { AudioSynthesizer } from '../engine/audio.js';
+
+    // =========================================================================
+    // RECIPES
+    // =========================================================================
+    const RECIPES = [
+      // Level 1 - single color
+      [
+        { colors: { 'do': 1 }, text: 'Bo 1 vat DO', emoji: '\u{1F431}', name: 'Meo lua' },
+        { colors: { 'xanh la': 2 }, text: 'Bo 2 vat XANH LA', emoji: '\u{1F438}', name: 'Ech phep' },
+        { colors: { 'vang': 3 }, text: 'Bo 3 vat VANG', emoji: '\u{1F425}', name: 'Ga vang than' },
+        { colors: { 'xanh duong': 2 }, text: 'Bo 2 vat XANH DUONG', emoji: '\u{1F41F}', name: 'Ca phep' },
+      ],
+      // Level 2 - two colors
+      [
+        { colors: { 'do': 1, 'xanh la': 1 }, text: 'Bo 1 DO + 1 XANH LA', emoji: '\u{1F98E}', name: 'Tac ke phep' },
+        { colors: { 'vang': 2, 'hong': 1 }, text: 'Bo 2 VANG + 1 HONG', emoji: '\u{1F984}', name: 'Ky lan' },
+        { colors: { 'xanh duong': 1, 'do': 2 }, text: 'Bo 1 XANH DUONG + 2 DO', emoji: '\u{1F409}', name: 'Rong con' },
+        { colors: { 'cam': 2, 'tim': 1 }, text: 'Bo 2 CAM + 1 TIM', emoji: '\u{1F98A}', name: 'Cao than' },
+      ],
+      // Level 3 - three colors
+      [
+        { colors: { 'do': 1, 'xanh la': 1, 'vang': 1 }, text: 'Bo 1 DO + 1 XANH + 1 VANG', emoji: '\u{1F308}', name: 'Phuong hoang' },
+        { colors: { 'tim': 2, 'hong': 1, 'xanh duong': 1 }, text: 'Bo 2 TIM + 1 HONG + 1 XANH DUONG', emoji: '\u{1F9DC}', name: 'Tien ca' },
+      ],
+    ];
+
+    const COLOR_HEX = {
+      'do': '#ef4444', 'cam': '#f97316', 'vang': '#eab308',
+      'xanh la': '#22c55e', 'xanh duong': '#3b82f6', 'tim': '#a855f7',
+      'hong': '#ec4899', 'den': '#374151', 'trang': '#f3f4f6', 'xam': '#9ca3af',
+    };
+
+    const COLOR_LABELS = {
+      'do': 'DO', 'cam': 'CAM', 'vang': 'VANG',
+      'xanh la': 'XANH LA', 'xanh duong': 'XANH DUONG', 'tim': 'TIM',
+      'hong': 'HONG', 'den': 'DEN', 'trang': 'TRANG', 'xam': 'XAM',
+    };
+
+    // =========================================================================
+    // STATE
+    // =========================================================================
+    let currentLevel = 0;
+    let currentRecipeIdx = 0;
+    let collectedCreatures = [];
+    let fulfillStart = 0;
+    let gameRunning = false;
+    let showingCreature = false;
+    const FULFILL_HOLD_MS = 2000;
+
+    // =========================================================================
+    // ENGINE INSTANCES
+    // =========================================================================
+    const vision = new VisionEngine();
+    const audio = new AudioSynthesizer();
+
+    // =========================================================================
+    // DOM REFS
+    // =========================================================================
+    const $start = document.getElementById('startScreen');
+    const $loading = document.getElementById('loadingMsg');
+    const $recipeCard = document.getElementById('recipeCard');
+    const $recipeText = document.getElementById('recipeText');
+    const $recipeColors = document.getElementById('recipeColors');
+    const $progress = document.getElementById('progressBar');
+    const $levelBadge = document.getElementById('levelBadge');
+    const $collection = document.getElementById('collectionBar');
+    const $creaturePopup = document.getElementById('creaturePopup');
+    const $creatureEmoji = document.getElementById('creatureEmoji');
+    const $creatureName = document.getElementById('creatureName');
+    const $winScreen = document.getElementById('winScreen');
+    const $winCollection = document.getElementById('winCollection');
+    const $markerContainer = document.getElementById('markerContainer');
+    const videoEl = document.getElementById('videoEl');
+
+    // =========================================================================
+    // START SCREEN SPARKLES
+    // =========================================================================
+    function populateSparkles(container, count) {
+      for (let i = 0; i < count; i++) {
+        const s = document.createElement('span');
+        s.style.left = Math.random() * 100 + '%';
+        s.style.animationDuration = (4 + Math.random() * 6) + 's';
+        s.style.animationDelay = Math.random() * 6 + 's';
+        s.style.width = s.style.height = (2 + Math.random() * 3) + 'px';
+        const hue = 260 + Math.random() * 60;
+        s.style.background = `hsl(${hue}, 80%, 70%)`;
+        container.appendChild(s);
+      }
+    }
+    populateSparkles(document.getElementById('startSparkles'), 50);
+    populateSparkles(document.getElementById('winSparkles'), 50);
+
+    // =========================================================================
+    // THREE.JS SETUP
+    // =========================================================================
+    let scene, camera, renderer, clock;
+    let cauldronGroup, bubbleParticles, steamParticles, ambientParticles;
+    let eruptionParticles = null;
+    let creatureSprite = null;
+    let sparkleTrail = null;
+    const cauldronY = -2.8;
+
+    function initThree() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(0, 0, 6);
+      clock = new THREE.Clock();
+
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setClearColor(0x000000, 0);
+      renderer.domElement.id = 'threeCanvas';
+      renderer.domElement.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:3;pointer-events:none;';
+      document.body.appendChild(renderer.domElement);
+
+      // Lighting
+      const ambient = new THREE.AmbientLight(0x6030a0, 0.6);
+      scene.add(ambient);
+
+      const cauldronLight = new THREE.PointLight(0x44ff88, 2.5, 8);
+      cauldronLight.position.set(0, cauldronY + 0.8, 2);
+      scene.add(cauldronLight);
+
+      const rimLight = new THREE.PointLight(0xaa55ff, 1.2, 10);
+      rimLight.position.set(0, cauldronY + 2, 3);
+      scene.add(rimLight);
+
+      buildCauldron();
+      buildBubbles();
+      buildSteam();
+      buildAmbientParticles();
+
+      window.addEventListener('resize', onResize);
+    }
+
+    function onResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // ---- Cauldron ----
+    function buildCauldron() {
+      cauldronGroup = new THREE.Group();
+      cauldronGroup.position.set(0, cauldronY, 0);
+
+      // Pot body - half sphere
+      const potGeo = new THREE.SphereGeometry(1.4, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.6);
+      const potMat = new THREE.MeshStandardMaterial({
+        color: 0x1a1a2e, metalness: 0.7, roughness: 0.3,
+        emissive: 0x0a0a1a, emissiveIntensity: 0.2,
+      });
+      const pot = new THREE.Mesh(potGeo, potMat);
+      pot.rotation.x = Math.PI;
+      pot.position.y = 0.3;
+      cauldronGroup.add(pot);
+
+      // Rim
+      const rimGeo = new THREE.TorusGeometry(1.38, 0.12, 12, 48);
+      const rimMat = new THREE.MeshStandardMaterial({
+        color: 0x2a2a4e, metalness: 0.8, roughness: 0.2,
+        emissive: 0x3a1a6a, emissiveIntensity: 0.3,
+      });
+      const rim = new THREE.Mesh(rimGeo, rimMat);
+      rim.rotation.x = Math.PI * 0.5;
+      rim.position.y = 0.32;
+      cauldronGroup.add(rim);
+
+      // Liquid surface
+      const liquidGeo = new THREE.CircleGeometry(1.3, 48);
+      const liquidMat = new THREE.MeshStandardMaterial({
+        color: 0x2aff6a, emissive: 0x115530, emissiveIntensity: 0.8,
+        transparent: true, opacity: 0.7, metalness: 0.1, roughness: 0.6,
+      });
+      const liquid = new THREE.Mesh(liquidGeo, liquidMat);
+      liquid.rotation.x = -Math.PI * 0.5;
+      liquid.position.y = 0.1;
+      cauldronGroup.add(liquid);
+      cauldronGroup.userData.liquid = liquid;
+
+      // Glow underneath
+      const glowGeo = new THREE.PlaneGeometry(4, 2);
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: 0x22ff66, transparent: true, opacity: 0.15,
+        side: THREE.DoubleSide,
+      });
+      const glow = new THREE.Mesh(glowGeo, glowMat);
+      glow.position.y = -0.9;
+      glow.rotation.x = -Math.PI * 0.5;
+      cauldronGroup.add(glow);
+      cauldronGroup.userData.glow = glow;
+
+      // Legs
+      for (let i = 0; i < 3; i++) {
+        const angle = (i / 3) * Math.PI * 2 - Math.PI * 0.5;
+        const legGeo = new THREE.CylinderGeometry(0.08, 0.12, 0.7, 8);
+        const legMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, metalness: 0.6, roughness: 0.4 });
+        const leg = new THREE.Mesh(legGeo, legMat);
+        leg.position.set(Math.cos(angle) * 0.9, -0.6, Math.sin(angle) * 0.9);
+        cauldronGroup.add(leg);
+      }
+
+      scene.add(cauldronGroup);
+    }
+
+    // ---- Bubbles ----
+    function buildBubbles() {
+      const count = 60;
+      const geo = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      const sizes = new Float32Array(count);
+      const speeds = new Float32Array(count);
+
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 2;
+        positions[i * 3 + 1] = cauldronY + Math.random() * 1.5;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 2;
+        sizes[i] = 8 + Math.random() * 16;
+        speeds[i] = 0.3 + Math.random() * 0.8;
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+      const mat = new THREE.PointsMaterial({
+        color: 0x44ff88, size: 0.12, transparent: true, opacity: 0.6,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+        sizeAttenuation: true,
+      });
+
+      bubbleParticles = new THREE.Points(geo, mat);
+      bubbleParticles.userData.speeds = speeds;
+      scene.add(bubbleParticles);
+    }
+
+    // ---- Steam ----
+    function buildSteam() {
+      const count = 30;
+      const geo = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      const speeds = new Float32Array(count);
+
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 1.5;
+        positions[i * 3 + 1] = cauldronY + 0.5 + Math.random() * 2;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 1.5;
+        speeds[i] = 0.2 + Math.random() * 0.5;
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+      const mat = new THREE.PointsMaterial({
+        color: 0xccbbff, size: 0.25, transparent: true, opacity: 0.2,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+        sizeAttenuation: true,
+      });
+
+      steamParticles = new THREE.Points(geo, mat);
+      steamParticles.userData.speeds = speeds;
+      scene.add(steamParticles);
+    }
+
+    // ---- Ambient Sparkles ----
+    function buildAmbientParticles() {
+      const count = 80;
+      const geo = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      const velocities = [];
+
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 12;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 8;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 6;
+        velocities.push({
+          x: (Math.random() - 0.5) * 0.01,
+          y: 0.005 + Math.random() * 0.015,
+          z: (Math.random() - 0.5) * 0.01,
+        });
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+      const mat = new THREE.PointsMaterial({
+        color: 0xbb88ff, size: 0.06, transparent: true, opacity: 0.4,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+        sizeAttenuation: true,
+      });
+
+      ambientParticles = new THREE.Points(geo, mat);
+      ambientParticles.userData.velocities = velocities;
+      scene.add(ambientParticles);
+    }
+
+    // ---- Eruption ----
+    function triggerEruption() {
+      if (eruptionParticles) {
+        scene.remove(eruptionParticles);
+        eruptionParticles.geometry.dispose();
+        eruptionParticles.material.dispose();
+      }
+
+      const count = 200;
+      const geo = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const velocities = [];
+
+      const eruptColors = [
+        new THREE.Color(0xff4488), new THREE.Color(0x44ff88),
+        new THREE.Color(0xffaa22), new THREE.Color(0x8844ff),
+        new THREE.Color(0x44aaff), new THREE.Color(0xff44ff),
+      ];
+
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 0.8;
+        positions[i * 3 + 1] = cauldronY + 0.5;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 0.8;
+
+        const c = eruptColors[Math.floor(Math.random() * eruptColors.length)];
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2 + Math.random() * 5;
+        const upSpeed = 3 + Math.random() * 6;
+        velocities.push({
+          x: Math.cos(angle) * speed * 0.3,
+          y: upSpeed,
+          z: Math.sin(angle) * speed * 0.3,
+          gravity: -4 - Math.random() * 3,
+          life: 1.0,
+          decay: 0.4 + Math.random() * 0.5,
+        });
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const mat = new THREE.PointsMaterial({
+        size: 0.15, vertexColors: true, transparent: true, opacity: 1,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+        sizeAttenuation: true,
+      });
+
+      eruptionParticles = new THREE.Points(geo, mat);
+      eruptionParticles.userData.velocities = velocities;
+      eruptionParticles.userData.startTime = clock.getElapsedTime();
+      scene.add(eruptionParticles);
+    }
+
+    // ---- Smoke (wrong answer) ----
+    let smokeParticles = null;
+    function triggerSmoke() {
+      if (smokeParticles) {
+        scene.remove(smokeParticles);
+        smokeParticles.geometry.dispose();
+        smokeParticles.material.dispose();
+      }
+
+      const count = 40;
+      const geo = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      const velocities = [];
+
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 1.5;
+        positions[i * 3 + 1] = cauldronY + 0.3;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 1.5;
+        velocities.push({
+          x: (Math.random() - 0.5) * 0.5,
+          y: 0.5 + Math.random() * 1.5,
+          z: (Math.random() - 0.5) * 0.5,
+          life: 1.0,
+          decay: 0.6 + Math.random() * 0.4,
+        });
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+      const mat = new THREE.PointsMaterial({
+        color: 0x332244, size: 0.3, transparent: true, opacity: 0.5,
+        blending: THREE.NormalBlending, depthWrite: false,
+        sizeAttenuation: true,
+      });
+
+      smokeParticles = new THREE.Points(geo, mat);
+      smokeParticles.userData.velocities = velocities;
+      smokeParticles.userData.startTime = clock.getElapsedTime();
+      scene.add(smokeParticles);
+    }
+
+    // ---- Creature Sprite ----
+    function spawnCreature3D(emoji) {
+      if (creatureSprite) {
+        scene.remove(creatureSprite);
+      }
+
+      // Create a canvas with the emoji
+      const cvs = document.createElement('canvas');
+      cvs.width = 256; cvs.height = 256;
+      const c = cvs.getContext('2d');
+      c.font = '180px serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(emoji, 128, 140);
+
+      const tex = new THREE.CanvasTexture(cvs);
+      const mat = new THREE.SpriteMaterial({
+        map: tex, transparent: true,
+        blending: THREE.NormalBlending,
+      });
+      creatureSprite = new THREE.Sprite(mat);
+      creatureSprite.scale.set(2.5, 2.5, 1);
+      creatureSprite.position.set(0, cauldronY + 1, 1);
+      creatureSprite.userData.startTime = clock.getElapsedTime();
+      scene.add(creatureSprite);
+
+      // Sparkle trail
+      buildSparkleTrail();
+    }
+
+    function buildSparkleTrail() {
+      if (sparkleTrail) {
+        scene.remove(sparkleTrail);
+        sparkleTrail.geometry.dispose();
+        sparkleTrail.material.dispose();
+      }
+
+      const count = 50;
+      const geo = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      const velocities = [];
+
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 0.5;
+        positions[i * 3 + 1] = cauldronY + 1;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 0.5 + 1;
+        velocities.push({
+          x: (Math.random() - 0.5) * 1.5,
+          y: -0.5 - Math.random() * 1.5,
+          z: (Math.random() - 0.5) * 1.5,
+          life: 1.0,
+          decay: 0.3 + Math.random() * 0.5,
+        });
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+      const mat = new THREE.PointsMaterial({
+        color: 0xffdd44, size: 0.08, transparent: true, opacity: 0.8,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+        sizeAttenuation: true,
+      });
+
+      sparkleTrail = new THREE.Points(geo, mat);
+      sparkleTrail.userData.velocities = velocities;
+      sparkleTrail.userData.startTime = clock.getElapsedTime();
+      scene.add(sparkleTrail);
+    }
+
+    // ---- Shake ----
+    let shakeUntil = 0;
+    function shakeCauldron() {
+      shakeUntil = clock.getElapsedTime() + 0.5;
+    }
+
+    // =========================================================================
+    // ANIMATE THREE.JS
+    // =========================================================================
+    function animateThree() {
+      requestAnimationFrame(animateThree);
+      const dt = clock.getDelta();
+      const t = clock.getElapsedTime();
+
+      // Cauldron gentle bob
+      if (cauldronGroup) {
+        cauldronGroup.position.y = cauldronY + Math.sin(t * 1.2) * 0.05;
+
+        // Shake
+        if (t < shakeUntil) {
+          cauldronGroup.position.x = Math.sin(t * 40) * 0.08;
+          cauldronGroup.rotation.z = Math.sin(t * 35) * 0.04;
+        } else {
+          cauldronGroup.position.x *= 0.9;
+          cauldronGroup.rotation.z *= 0.9;
+        }
+
+        // Liquid color pulse
+        const liquid = cauldronGroup.userData.liquid;
+        if (liquid) {
+          const hue = (t * 0.05) % 1;
+          liquid.material.color.setHSL(hue * 0.2 + 0.28, 0.8, 0.45);
+          liquid.material.emissive.setHSL(hue * 0.2 + 0.28, 0.6, 0.2);
+        }
+
+        // Glow pulse
+        const glow = cauldronGroup.userData.glow;
+        if (glow) {
+          glow.material.opacity = 0.12 + Math.sin(t * 2) * 0.05;
+        }
+      }
+
+      // Bubbles
+      if (bubbleParticles) {
+        const pos = bubbleParticles.geometry.attributes.position;
+        const speeds = bubbleParticles.userData.speeds;
+        for (let i = 0; i < pos.count; i++) {
+          let y = pos.getY(i) + speeds[i] * dt;
+          const x = pos.getX(i) + Math.sin(t * 2 + i) * 0.003;
+          if (y > cauldronY + 2) {
+            y = cauldronY - 0.2;
+            pos.setX(i, (Math.random() - 0.5) * 2);
+            pos.setZ(i, (Math.random() - 0.5) * 2);
+          }
+          pos.setX(i, x);
+          pos.setY(i, y);
+        }
+        pos.needsUpdate = true;
+        bubbleParticles.material.opacity = 0.4 + Math.sin(t * 3) * 0.2;
+      }
+
+      // Steam
+      if (steamParticles) {
+        const pos = steamParticles.geometry.attributes.position;
+        const speeds = steamParticles.userData.speeds;
+        for (let i = 0; i < pos.count; i++) {
+          let y = pos.getY(i) + speeds[i] * dt;
+          const x = pos.getX(i) + Math.sin(t * 0.8 + i * 0.5) * 0.005;
+          if (y > cauldronY + 4) {
+            y = cauldronY + 0.5;
+            pos.setX(i, (Math.random() - 0.5) * 1.5);
+            pos.setZ(i, (Math.random() - 0.5) * 1.5);
+          }
+          pos.setX(i, x);
+          pos.setY(i, y);
+        }
+        pos.needsUpdate = true;
+      }
+
+      // Ambient sparkles
+      if (ambientParticles) {
+        const pos = ambientParticles.geometry.attributes.position;
+        const vels = ambientParticles.userData.velocities;
+        for (let i = 0; i < pos.count; i++) {
+          pos.setX(i, pos.getX(i) + vels[i].x);
+          pos.setY(i, pos.getY(i) + vels[i].y);
+          pos.setZ(i, pos.getZ(i) + vels[i].z);
+          if (pos.getY(i) > 5) {
+            pos.setY(i, -5);
+            pos.setX(i, (Math.random() - 0.5) * 12);
+            pos.setZ(i, (Math.random() - 0.5) * 6);
+          }
+        }
+        pos.needsUpdate = true;
+        ambientParticles.material.opacity = 0.25 + Math.sin(t * 0.5) * 0.15;
+      }
+
+      // Eruption particles
+      if (eruptionParticles) {
+        const pos = eruptionParticles.geometry.attributes.position;
+        const vels = eruptionParticles.userData.velocities;
+        let allDead = true;
+        for (let i = 0; i < pos.count; i++) {
+          const v = vels[i];
+          if (v.life <= 0) continue;
+          allDead = false;
+          v.y += v.gravity * dt;
+          pos.setX(i, pos.getX(i) + v.x * dt);
+          pos.setY(i, pos.getY(i) + v.y * dt);
+          pos.setZ(i, pos.getZ(i) + v.z * dt);
+          v.life -= v.decay * dt;
+        }
+        pos.needsUpdate = true;
+        if (allDead) {
+          scene.remove(eruptionParticles);
+          eruptionParticles.geometry.dispose();
+          eruptionParticles.material.dispose();
+          eruptionParticles = null;
+        } else {
+          eruptionParticles.material.opacity = Math.max(0, vels[0].life);
+        }
+      }
+
+      // Smoke particles
+      if (smokeParticles) {
+        const pos = smokeParticles.geometry.attributes.position;
+        const vels = smokeParticles.userData.velocities;
+        let allDead = true;
+        for (let i = 0; i < pos.count; i++) {
+          const v = vels[i];
+          if (v.life <= 0) continue;
+          allDead = false;
+          pos.setX(i, pos.getX(i) + v.x * dt);
+          pos.setY(i, pos.getY(i) + v.y * dt);
+          pos.setZ(i, pos.getZ(i) + v.z * dt);
+          v.life -= v.decay * dt;
+        }
+        pos.needsUpdate = true;
+        if (allDead) {
+          scene.remove(smokeParticles);
+          smokeParticles.geometry.dispose();
+          smokeParticles.material.dispose();
+          smokeParticles = null;
+        } else {
+          smokeParticles.material.opacity = 0.4 * Math.max(0, vels[0].life);
+        }
+      }
+
+      // Creature sprite float up
+      if (creatureSprite) {
+        const age = t - creatureSprite.userData.startTime;
+        creatureSprite.position.y = cauldronY + 1 + age * 0.6;
+        creatureSprite.material.rotation = Math.sin(age * 2) * 0.15;
+        if (age > 4) {
+          scene.remove(creatureSprite);
+          creatureSprite.material.map.dispose();
+          creatureSprite.material.dispose();
+          creatureSprite = null;
+        }
+      }
+
+      // Sparkle trail
+      if (sparkleTrail) {
+        const pos = sparkleTrail.geometry.attributes.position;
+        const vels = sparkleTrail.userData.velocities;
+        let allDead = true;
+        for (let i = 0; i < pos.count; i++) {
+          const v = vels[i];
+          if (v.life <= 0) continue;
+          allDead = false;
+          pos.setX(i, pos.getX(i) + v.x * dt);
+          pos.setY(i, pos.getY(i) + v.y * dt);
+          pos.setZ(i, pos.getZ(i) + v.z * dt);
+          v.life -= v.decay * dt;
+        }
+        pos.needsUpdate = true;
+        if (allDead) {
+          scene.remove(sparkleTrail);
+          sparkleTrail.geometry.dispose();
+          sparkleTrail.material.dispose();
+          sparkleTrail = null;
+        } else {
+          sparkleTrail.material.opacity = 0.7 * Math.max(0, vels[0].life);
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // =========================================================================
+    // OVERLAY CANVAS (detection markers)
+    // =========================================================================
+    const overlayCanvas = document.getElementById('overlayCanvas');
+    const overlayCtx = overlayCanvas.getContext('2d');
+
+    function resizeOverlay() {
+      overlayCanvas.width = window.innerWidth;
+      overlayCanvas.height = window.innerHeight;
+    }
+    resizeOverlay();
+    window.addEventListener('resize', resizeOverlay);
+
+    function drawDetections(detections) {
+      overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+      // Draw cauldron zone indicator
+      const zoneH = overlayCanvas.height * 0.6;
+      const zoneY = overlayCanvas.height - zoneH;
+      overlayCtx.strokeStyle = 'rgba(168, 85, 247, 0.25)';
+      overlayCtx.lineWidth = 2;
+      overlayCtx.setLineDash([8, 8]);
+      overlayCtx.strokeRect(10, zoneY, overlayCanvas.width - 20, zoneH - 10);
+      overlayCtx.setLineDash([]);
+
+      // Zone label
+      overlayCtx.fillStyle = 'rgba(168, 85, 247, 0.4)';
+      overlayCtx.font = '600 13px Fredoka, sans-serif';
+      overlayCtx.fillText('Vung noi than', 20, zoneY + 18);
+
+      const vw = vision.video.videoWidth || 640;
+      const vh = vision.video.videoHeight || 480;
+
+      for (const det of detections) {
+        const bb = det.boundingBox;
+        const colorName = det._color || 'unknown';
+        const hex = COLOR_HEX[colorName] || '#888';
+
+        // Map bounding box to screen (mirrored)
+        const sx = overlayCanvas.width - ((bb.originX + bb.width) / vw) * overlayCanvas.width;
+        const sy = (bb.originY / vh) * overlayCanvas.height;
+        const sw = (bb.width / vw) * overlayCanvas.width;
+        const sh = (bb.height / vh) * overlayCanvas.height;
+
+        // Draw box
+        overlayCtx.strokeStyle = hex;
+        overlayCtx.lineWidth = 2.5;
+        overlayCtx.strokeRect(sx, sy, sw, sh);
+
+        // Fill with subtle color
+        overlayCtx.fillStyle = hex + '18';
+        overlayCtx.fillRect(sx, sy, sw, sh);
+
+        // Label background
+        const label = COLOR_LABELS[colorName] || colorName;
+        overlayCtx.font = '700 13px Fredoka, sans-serif';
+        const labelW = overlayCtx.measureText(label).width + 12;
+        overlayCtx.fillStyle = hex + 'cc';
+        overlayCtx.beginPath();
+        overlayCtx.roundRect(sx, sy - 22, labelW, 20, 4);
+        overlayCtx.fill();
+
+        // Label text
+        overlayCtx.fillStyle = '#fff';
+        overlayCtx.fillText(label, sx + 6, sy - 6);
+      }
+    }
+
+    // =========================================================================
+    // RECIPE UI
+    // =========================================================================
+    function showRecipe(recipe) {
+      $recipeCard.classList.remove('hidden');
+      $recipeText.textContent = recipe.text;
+
+      $recipeColors.innerHTML = '';
+      for (const [color, count] of Object.entries(recipe.colors)) {
+        const item = document.createElement('div');
+        item.className = 'recipe-color-item';
+        item.dataset.color = color;
+
+        const dot = document.createElement('div');
+        dot.className = 'color-dot';
+        dot.style.backgroundColor = COLOR_HEX[color] || '#888';
+
+        const countEl = document.createElement('span');
+        countEl.className = 'color-count';
+        countEl.textContent = `0/${count}`;
+
+        item.appendChild(dot);
+        item.appendChild(countEl);
+        $recipeColors.appendChild(item);
+      }
+
+      $progress.classList.remove('hidden');
+      $progress.textContent = 'Dat do vat vao truoc camera...';
+    }
+
+    function updateRecipeUI(colorCounts, recipe) {
+      let allFulfilled = true;
+      const items = $recipeColors.querySelectorAll('.recipe-color-item');
+
+      for (const item of items) {
+        const color = item.dataset.color;
+        const needed = recipe.colors[color];
+        const have = colorCounts[color] || 0;
+        const fulfilled = have >= needed;
+
+        item.querySelector('.color-count').textContent = `${Math.min(have, needed)}/${needed}`;
+        item.classList.toggle('fulfilled', fulfilled);
+
+        if (!fulfilled) allFulfilled = false;
+      }
+
+      // Progress text
+      if (allFulfilled) {
+        $progress.textContent = 'Giu nguyen... dang pha che!';
+        $progress.style.color = '#4ade80';
+      } else {
+        const parts = [];
+        for (const [color, needed] of Object.entries(recipe.colors)) {
+          const have = Math.min(colorCounts[color] || 0, needed);
+          parts.push(`${COLOR_LABELS[color]}: ${have}/${needed}`);
+        }
+        $progress.textContent = parts.join('  |  ');
+        $progress.style.color = '';
+      }
+
+      return allFulfilled;
+    }
+
+    function updateLevelBadge() {
+      $levelBadge.textContent = `Cap ${currentLevel + 1}`;
+    }
+
+    function updateCollection() {
+      $collection.classList.toggle('hidden', collectedCreatures.length === 0);
+      $collection.innerHTML = '';
+      collectedCreatures.forEach((emoji, i) => {
+        const span = document.createElement('span');
+        span.className = 'collected-creature';
+        span.textContent = emoji;
+        span.style.animationDelay = (i * 0.05) + 's';
+        $collection.appendChild(span);
+      });
+    }
+
+    // =========================================================================
+    // CREATURE POPUP
+    // =========================================================================
+    function showCreaturePopup(emoji, name) {
+      showingCreature = true;
+      $creatureEmoji.textContent = emoji;
+      $creatureName.textContent = `${emoji} ${name.toUpperCase()} xuat hien!`;
+      $creaturePopup.classList.add('visible');
+
+      setTimeout(() => {
+        $creaturePopup.classList.remove('visible');
+        showingCreature = false;
+        nextRecipe();
+      }, 4000);
+    }
+
+    // =========================================================================
+    // WIN SCREEN
+    // =========================================================================
+    function showWin() {
+      gameRunning = false;
+      audio.playWin();
+      $recipeCard.classList.add('hidden');
+      $progress.classList.add('hidden');
+
+      $winCollection.innerHTML = '';
+      collectedCreatures.forEach((emoji, i) => {
+        const span = document.createElement('span');
+        span.className = 'win-creature';
+        span.textContent = emoji;
+        span.style.animationDelay = (i * 0.2) + 's';
+        $winCollection.appendChild(span);
+      });
+
+      $winScreen.classList.remove('hidden');
+    }
+
+    document.getElementById('playAgainBtn').addEventListener('click', () => {
+      audio.init();
+      audio.playPop();
+      $winScreen.classList.add('hidden');
+      currentLevel = 0;
+      currentRecipeIdx = 0;
+      collectedCreatures = [];
+      updateCollection();
+      updateLevelBadge();
+      startRecipe();
+    });
+
+    // =========================================================================
+    // GAME FLOW
+    // =========================================================================
+    function getCurrentRecipe() {
+      if (currentLevel >= RECIPES.length) return null;
+      if (currentRecipeIdx >= RECIPES[currentLevel].length) return null;
+      return RECIPES[currentLevel][currentRecipeIdx];
+    }
+
+    function startRecipe() {
+      gameRunning = true;
+      fulfillStart = 0;
+      const recipe = getCurrentRecipe();
+      if (!recipe) {
+        showWin();
+        return;
+      }
+      showRecipe(recipe);
+    }
+
+    function nextRecipe() {
+      currentRecipeIdx++;
+      if (currentRecipeIdx >= RECIPES[currentLevel].length) {
+        currentLevel++;
+        currentRecipeIdx = 0;
+        updateLevelBadge();
+        if (currentLevel >= RECIPES.length) {
+          showWin();
+          return;
+        }
+      }
+      fulfillStart = 0;
+      startRecipe();
+    }
+
+    function onRecipeFulfilled(recipe) {
+      gameRunning = false;
+      audio.playScore();
+
+      // 3D effects
+      triggerEruption();
+      spawnCreature3D(recipe.emoji);
+
+      // Collect
+      collectedCreatures.push(recipe.emoji);
+      updateCollection();
+
+      // Show popup after a short delay for eruption
+      setTimeout(() => {
+        audio.playWin();
+        showCreaturePopup(recipe.emoji, recipe.name);
+      }, 800);
+    }
+
+    // =========================================================================
+    // MAIN DETECTION LOOP
+    // =========================================================================
+    let lastDetectTime = 0;
+    const DETECT_INTERVAL = 200; // ms between detections
+
+    function gameLoop(timestamp) {
+      requestAnimationFrame(gameLoop);
+
+      if (!vision.ready || !gameRunning || showingCreature) return;
+      if (timestamp - lastDetectTime < DETECT_INTERVAL) return;
+      lastDetectTime = timestamp;
+
+      const recipe = getCurrentRecipe();
+      if (!recipe) return;
+
+      // Detect objects
+      const result = vision.detectObjects(timestamp);
+      if (!result || !result.detections) return;
+
+      // Filter to cauldron zone (lower 60% of screen)
+      const zoneDetections = vision.getObjectsInZone(result.detections, {
+        x: 0, y: 0.4, w: 1, h: 0.6,
+      });
+
+      // Analyze colors for each detection
+      const colorCounts = {};
+      for (const det of zoneDetections) {
+        const color = vision.getDominantColor(det.boundingBox);
+        det._color = color;
+        if (color && color !== 'unknown') {
+          colorCounts[color] = (colorCounts[color] || 0) + 1;
+        }
+      }
+
+      // Draw overlay
+      drawDetections(zoneDetections);
+
+      // Update recipe UI and check fulfillment
+      const fulfilled = updateRecipeUI(colorCounts, recipe);
+
+      if (fulfilled) {
+        if (fulfillStart === 0) {
+          fulfillStart = timestamp;
+          audio.playCorrect();
+        } else if (timestamp - fulfillStart >= FULFILL_HOLD_MS) {
+          onRecipeFulfilled(recipe);
+        }
+      } else {
+        if (fulfillStart > 0) {
+          // Was fulfilled but lost it
+          fulfillStart = 0;
+          shakeCauldron();
+          triggerSmoke();
+          audio.playWrong();
+        }
+      }
+    }
+
+    // =========================================================================
+    // INIT
+    // =========================================================================
+    async function init() {
+      $start.classList.add('hidden');
+      $loading.classList.remove('hidden');
+
+      try {
+        // Init Three.js while AI loads
+        initThree();
+        animateThree();
+
+        // Init vision
+        await vision.initObjectDetection({ scoreThreshold: 0.25, maxResults: 20 });
+
+        // Pipe camera to both the video element and vision engine
+        await vision.startCamera();
+
+        // Use vision's video stream for our background
+        videoEl.srcObject = vision.video.srcObject;
+        await new Promise(r => { videoEl.onloadeddata = r; });
+
+        $loading.classList.add('hidden');
+
+        // Start game
+        updateLevelBadge();
+        updateCollection();
+        startRecipe();
+        requestAnimationFrame(gameLoop);
+
+      } catch (err) {
+        console.error('Init error:', err);
+        $loading.innerHTML = `
+          <div style="color:#f87171;text-align:center;padding:24px;">
+            Khong the khoi dong camera hoac AI.<br>
+            <span style="font-size:14px;color:rgba(255,255,255,0.5);">${err.message || err}</span><br><br>
+            <a href="../index.html" style="color:#a855f7;">Ve trang chu</a>
+          </div>
+        `;
+      }
+    }
+
+    // Start button
+    document.getElementById('startBtn').addEventListener('click', () => {
+      audio.init();
+      audio.playPop();
+      init();
+    });
+  </script>
+</body>
+</html>
