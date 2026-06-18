@@ -3,501 +3,168 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>KidZone - Bo cong cu hoc tap tuong tac</title>
+  <title>KidZone - Hoc tap tuong tac cho tre em</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #09070f; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #f3f4f6; }
-
-    /* --- LAUNCHER --- */
-    #launcher {
-      position: fixed; inset: 0; z-index: 100;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      background: #09070f;
+    html, body {
+      width: 100%; min-height: 100vh;
+      background: linear-gradient(135deg, #0f0520 0%, #1a0a3e 40%, #0d1b3e 100%);
+      font-family: 'Fredoka', 'Plus Jakarta Sans', system-ui, sans-serif;
+      color: #f3f4f6; overflow-x: hidden;
     }
-    #launcher.hidden { display: none; }
 
-    #launcher h1 {
-      font-family: 'Orbitron', sans-serif; font-size: clamp(32px, 5vw, 64px); font-weight: 900;
-      background: linear-gradient(135deg, #818cf8 0%, #d946ef 50%, #f97316 100%);
+    .container {
+      max-width: 1000px; margin: 0 auto; padding: 60px 24px 80px;
+      display: flex; flex-direction: column; align-items: center;
+    }
+
+    h1 {
+      font-family: 'Fredoka', sans-serif; font-size: clamp(42px, 7vw, 80px); font-weight: 700;
+      background: linear-gradient(135deg, #fbbf24 0%, #f97316 30%, #ec4899 60%, #818cf8 100%);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      margin-bottom: 8px;
+      text-align: center; line-height: 1.1;
     }
-    #launcher .subtitle {
-      font-size: clamp(14px, 1.8vw, 22px); color: #9ca3af; margin-bottom: 48px; text-align: center;
+
+    .subtitle {
+      font-size: clamp(16px, 2.2vw, 24px); color: rgba(255,255,255,0.6);
+      margin: 12px 0 16px; text-align: center;
     }
+
+    .tech-badge {
+      display: inline-flex; gap: 8px; align-items: center;
+      padding: 6px 18px; border-radius: 999px;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 48px;
+    }
+    .tech-badge span { color: #818cf8; font-weight: 600; }
 
     .game-grid {
-      display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;
-      max-width: 800px; width: 90%; padding: 0 20px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px; width: 100%;
     }
+
     .game-card {
+      position: relative; overflow: hidden;
       background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 24px; padding: 32px 24px; cursor: pointer;
-      transition: all 0.25s cubic-bezier(0.4,0,0.2,1); text-align: center;
-      backdrop-filter: blur(8px);
+      border-radius: 28px; padding: 36px 28px 32px; cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+      text-decoration: none; color: inherit; display: block;
     }
+    .game-card::before {
+      content: ''; position: absolute; inset: 0; border-radius: 28px;
+      background: radial-gradient(ellipse at 50% 0%, var(--glow) 0%, transparent 70%);
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .game-card:hover::before { opacity: 1; }
     .game-card:hover {
-      transform: translateY(-6px); border-color: rgba(129,140,248,0.4);
-      box-shadow: 0 20px 50px rgba(99,102,241,0.2);
+      transform: translateY(-8px);
+      border-color: var(--border);
+      box-shadow: 0 24px 60px var(--shadow);
     }
-    .game-card .icon { font-size: 56px; margin-bottom: 16px; display: block; }
+
+    .game-card .icon { font-size: 64px; margin-bottom: 16px; display: block; position: relative; }
     .game-card .name {
-      font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 18px;
-      color: #fff; margin-bottom: 8px;
+      font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 22px;
+      color: #fff; margin-bottom: 10px; position: relative;
     }
-    .game-card .desc { font-size: 13px; color: #9ca3af; line-height: 1.5; }
-    .game-card .age { display: inline-block; margin-top: 12px; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; background: rgba(99,102,241,0.15); color: #818cf8; }
+    .game-card .desc {
+      font-size: 14px; color: rgba(255,255,255,0.55); line-height: 1.6; position: relative;
+    }
+    .game-card .tags {
+      display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; position: relative;
+    }
+    .game-card .tag {
+      padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 600;
+      background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);
+    }
+    .game-card .tag.ai { background: rgba(129,140,248,0.15); color: #818cf8; }
 
-    .game-card:nth-child(1):hover { border-color: rgba(251,191,36,0.5); box-shadow: 0 20px 50px rgba(251,191,36,0.15); }
-    .game-card:nth-child(2):hover { border-color: rgba(16,185,129,0.5); box-shadow: 0 20px 50px rgba(16,185,129,0.15); }
-    .game-card:nth-child(3):hover { border-color: rgba(236,72,153,0.5); box-shadow: 0 20px 50px rgba(236,72,153,0.15); }
-    .game-card:nth-child(4):hover { border-color: rgba(99,102,241,0.5); box-shadow: 0 20px 50px rgba(99,102,241,0.15); }
+    .card-counting { --glow: rgba(251,191,36,0.08); --border: rgba(251,191,36,0.4); --shadow: rgba(251,191,36,0.1); }
+    .card-potion { --glow: rgba(168,85,247,0.08); --border: rgba(168,85,247,0.4); --shadow: rgba(168,85,247,0.1); }
+    .card-garden { --glow: rgba(34,197,94,0.08); --border: rgba(34,197,94,0.4); --shadow: rgba(34,197,94,0.1); }
 
-    /* --- GAME VIEW --- */
-    #stage { position: fixed; inset: 0; z-index: 1; }
+    .footer {
+      margin-top: 64px; text-align: center; color: rgba(255,255,255,0.3); font-size: 13px;
+      line-height: 1.8;
+    }
+    .footer a { color: rgba(255,255,255,0.5); }
 
-    #cameraPreviewContainer {
-      position: fixed; right: 20px; bottom: 20px; display: flex; gap: 12px; z-index: 4;
-      background: rgba(15,12,30,0.7); padding: 12px; border-radius: 18px;
-      backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1);
-      box-shadow: 0 16px 40px rgba(0,0,0,0.6); transition: opacity 0.3s;
+    .stars {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
     }
-    .preview-box { position: relative; width: 180px; height: 112px; }
-    .preview-box video, .preview-box canvas {
-      width: 100%; height: 100%; object-fit: cover; border-radius: 10px;
-      background: #050408; transform: scaleX(-1); border: 1px solid rgba(255,255,255,0.15);
+    .stars span {
+      position: absolute; width: 2px; height: 2px; background: white; border-radius: 50%;
+      animation: twinkle 3s infinite alternate;
     }
-    .preview-box .label {
-      position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
-      background: rgba(9,7,15,0.85); border: 1px solid rgba(255,255,255,0.1);
-      color: #fff; font-size: 10px; font-family: 'Orbitron', sans-serif; font-weight: 700;
-      padding: 2px 8px; border-radius: 999px; pointer-events: none;
-    }
+    @keyframes twinkle { 0% { opacity: 0.2; } 100% { opacity: 0.8; } }
 
-    #hud {
-      position: fixed; top: 20px; left: 20px; padding: 24px;
-      background: rgba(15,12,30,0.78); backdrop-filter: blur(16px);
-      border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; z-index: 5;
-      font-size: 14px; line-height: 1.5; max-width: 680px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.55);
-    }
-    #hud h2 {
-      margin: 0 0 14px 0; font-family: 'Orbitron', sans-serif; font-size: 18px;
-      font-weight: 900; letter-spacing: 0.05em; color: #818cf8; display: flex; align-items: center; gap: 10px;
-    }
-    #hud-header-info { background: rgba(255,255,255,0.05); padding: 10px 14px; border-radius: 12px; margin-bottom: 16px; border-left: 4px solid #6366f1; }
-    #hud-header-info div { margin: 3px 0; }
-    #status { font-weight: 800; color: #fbbf24; font-family: 'Orbitron', sans-serif; }
-    #score { font-weight: 800; color: #10b981; font-family: 'Orbitron', sans-serif; }
-
-    #gameOverlay {
-      position: fixed; top: 24px; left: 50%; transform: translateX(-50%); z-index: 3;
-      text-align: center; color: #fff; pointer-events: none;
-    }
-    #levelTitle {
-      font-family: 'Orbitron', sans-serif; font-size: clamp(24px, 3.5vw, 52px); font-weight: 900;
-      letter-spacing: 0.05em; background: linear-gradient(135deg, #fff 40%, #a5b4fc 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    }
-    #levelInfo {
-      display: inline-flex; gap: 16px; align-items: center; margin-top: 14px;
-      padding: 10px 26px; border-radius: 999px;
-      background: rgba(15,12,30,0.82); border: 1px solid rgba(255,255,255,0.12);
-      font-family: 'Orbitron', sans-serif; font-size: clamp(14px, 1.4vw, 22px); font-weight: 800;
-      box-shadow: 0 12px 36px rgba(0,0,0,0.4); backdrop-filter: blur(12px);
-    }
-    #scoreBig { color: #10b981; text-shadow: 0 0 10px rgba(16,185,129,0.5); }
-    #timerBig { color: #f43f5e; text-shadow: 0 0 10px rgba(244,63,94,0.5); }
-    #progressWrap {
-      width: min(600px, 74vw); height: 12px; margin: 16px auto 0; border-radius: 999px;
-      background: rgba(255,255,255,0.08); overflow: hidden; border: 1px solid rgba(255,255,255,0.05);
-    }
-    #progressBar {
-      height: 100%; width: 0%; border-radius: 999px;
-      background: linear-gradient(90deg, #6366f1, #d946ef);
-      box-shadow: 0 0 12px rgba(99,102,241,0.8); transition: width 0.2s;
-    }
-
-    #centerMessage {
-      position: fixed; inset: 0; z-index: 2; display: grid; place-items: center;
-      pointer-events: none; color: #fff; font-family: 'Orbitron', sans-serif;
-      font-size: clamp(48px, 9vw, 130px); font-weight: 900; letter-spacing: 0.05em;
-      opacity: 0; transform: scale(0.88);
-      transition: opacity 0.3s cubic-bezier(0.175,0.885,0.32,1.275), transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275);
-      text-shadow: 0 0 30px rgba(99,102,241,0.85), 0 10px 40px rgba(0,0,0,0.6);
-    }
-    #centerMessage.show { opacity: 1; transform: scale(1); }
-
-    .row { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    .row.tiny {
-      display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
-      background: rgba(255,255,255,0.03); padding: 12px; border-radius: 12px;
-      margin-top: 16px; border: 1px solid rgba(255,255,255,0.05);
-    }
-    .slider-group { display: flex; flex-direction: column; gap: 4px; }
-    .slider-label { font-size: 11px; font-weight: 600; color: #9ca3af; display: flex; justify-content: space-between; }
-    .slider-label span:last-child { color: #818cf8; font-family: 'Orbitron', sans-serif; font-weight: 700; }
-
-    button {
-      background: linear-gradient(135deg, #4f46e5, #6366f1); color: white; border: none;
-      border-radius: 999px; padding: 10px 18px; font-weight: 700; font-family: inherit;
-      font-size: 13px; cursor: pointer; box-shadow: 0 4px 14px rgba(79,70,229,0.3);
-      transition: all 0.2s; outline: none;
-    }
-    button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(99,102,241,0.5); filter: brightness(1.1); }
-    button:active { transform: translateY(0); }
-    button.danger { background: linear-gradient(135deg, #dc2626, #f87171); box-shadow: 0 4px 14px rgba(220,38,38,0.3); }
-    button.success { background: linear-gradient(135deg, #059669, #34d399); box-shadow: 0 4px 14px rgba(5,150,105,0.3); }
-    button.active { background: linear-gradient(135deg, #d97706, #fbbf24) !important; box-shadow: 0 4px 16px rgba(217,119,6,0.5) !important; }
-    button.toggle-on { background: linear-gradient(135deg, #059669, #10b981) !important; }
-    button.toggle-off { background: linear-gradient(135deg, #4b5563, #6b7280); box-shadow: none; }
-
-    select {
-      background: #1e1b3a; color: white; border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 999px; padding: 8px 16px; font-weight: 700; font-family: inherit;
-      font-size: 13px; cursor: pointer; outline: none;
-    }
-    select:hover { border-color: #818cf8; }
-
-    input[type="range"] {
-      -webkit-appearance: none; width: 100%; height: 6px;
-      background: rgba(255,255,255,0.15); border-radius: 999px; outline: none; margin: 8px 0;
-    }
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
-      background: #818cf8; cursor: pointer; border: 2px solid #fff;
-    }
-
-    #tip {
-      background: rgba(255,255,255,0.03); border-radius: 12px; padding: 12px 14px;
-      font-size: 11.5px; color: #9ca3af; margin-top: 14px; border: 1px solid rgba(255,255,255,0.05); line-height: 1.6;
-    }
-    #tip b { color: #f3f4f6; }
-
-    body.projection #hud, body.projection #cameraPreviewContainer { display: none; }
-    #gameView { display: none; }
-    #gameView.active { display: block; }
+    .container { position: relative; z-index: 1; }
   </style>
 </head>
 <body>
+  <div class="stars" id="stars"></div>
 
-  <!-- ===== LAUNCHER SCREEN ===== -->
-  <div id="launcher">
+  <div class="container">
     <h1>KIDZONE</h1>
-    <div class="subtitle">Bo cong cu hoc tap tuong tac cho tre em</div>
+    <div class="subtitle">Hoc tap tuong tac cho tre mam non</div>
+    <div class="tech-badge">
+      Powered by <span>MediaPipe AI</span> + <span>Three.js</span> + <span>Webcam</span>
+    </div>
+
     <div class="game-grid">
-      <div class="game-card" data-game="bounce-ball">
-        <span class="icon">🏀</span>
-        <div class="name">DAN BONG VAO RO</div>
-        <div class="desc">Dat tuong nay de dan bong vao ro. Hoc ve goc phan xa va trong luc.</div>
-        <span class="age">3-8 tuoi</span>
-      </div>
-      <div class="game-card" data-game="fruit-sorter">
-        <span class="icon">🍎</span>
-        <div class="name">PHAN LOAI TRAI CAY</div>
-        <div class="desc">Phan luong trai cay vao dung ro. Hoc dem so, phan loai va logic.</div>
-        <span class="age">3-8 tuoi</span>
-      </div>
-      <div class="game-card" data-game="letter-catcher">
-        <span class="icon">🔤</span>
-        <div class="name">BAT CHU CAI</div>
-        <div class="desc">Dan chu cai dung vao o ghep tu. Hoc nhan dien chu va chinh ta.</div>
-        <span class="age">4-8 tuoi</span>
-      </div>
-      <div class="game-card" data-game="path-builder">
-        <span class="icon">🌉</span>
-        <div class="name">XAY CAU QUA SONG</div>
-        <div class="desc">Xay cau cho thu cung qua song. Hoc giai do va tu duy sang tao.</div>
-        <span class="age">3-8 tuoi</span>
-      </div>
+      <a class="game-card card-counting" href="games/counting.html">
+        <span class="icon">🔢</span>
+        <div class="name">Hoc Dem</div>
+        <div class="desc">Dat do vat len ban — may tinh tu dong dem so luong! Hoc dem 1-10 voi phan hoi 3D sinh dong.</div>
+        <div class="tags">
+          <span class="tag">3-5 tuoi</span>
+          <span class="tag ai">Object Detection</span>
+          <span class="tag">Toan hoc</span>
+        </div>
+      </a>
+
+      <a class="game-card card-potion" href="games/potion.html">
+        <span class="icon">🧙</span>
+        <div class="name">Phu Thuy Pha Che</div>
+        <div class="desc">Tro thanh phu thuy! Bo do vat theo cong thuc mau sac — noi than ky se tao ra sinh vat phep thuat!</div>
+        <div class="tags">
+          <span class="tag">3-5 tuoi</span>
+          <span class="tag ai">Object + Color AI</span>
+          <span class="tag">Dem + Mau sac</span>
+        </div>
+      </a>
+
+      <a class="game-card card-garden" href="games/garden.html">
+        <span class="icon">🌺</span>
+        <div class="name">Khu Vuon Phep Thuat</div>
+        <div class="desc">Dat "hat giong" — cay moc len tuoi dep! Vay tay de tuoi nuoc. Xay khu vuon cua rieng ban!</div>
+        <div class="tags">
+          <span class="tag">3-5 tuoi</span>
+          <span class="tag ai">Object + Hand Tracking</span>
+          <span class="tag">Dem + Thien nhien</span>
+        </div>
+      </a>
+    </div>
+
+    <div class="footer">
+      Chi can laptop + webcam. Khong can phan cung dac biet!<br>
+      Giao vien: mo trang nay &rarr; chon tro choi &rarr; bat camera &rarr; chieu len tuong
     </div>
   </div>
 
-  <!-- ===== GAME VIEW ===== -->
-  <div id="gameView">
-    <canvas id="stage"></canvas>
-
-    <div id="cameraPreviewContainer">
-      <div class="preview-box">
-        <video id="videoPreview" autoplay playsinline muted></video>
-        <div class="label">Camera</div>
-      </div>
-      <div class="preview-box">
-        <canvas id="maskPreview"></canvas>
-        <div class="label">Nhan dien</div>
-      </div>
-    </div>
-
-    <div id="gameOverlay">
-      <div id="levelTitle"></div>
-      <div id="levelInfo">
-        <span>Diem</span>
-        <span id="scoreBig">0</span>
-        <span>/</span>
-        <span id="targetBig">5</span>
-        <span>&middot;</span>
-        <span id="timerBig">60 giay</span>
-      </div>
-      <div id="progressWrap"><div id="progressBar"></div></div>
-    </div>
-
-    <div id="centerMessage"></div>
-
-    <div id="hud">
-      <h2 id="hudTitle">KIDZONE</h2>
-      <div id="hud-header-info">
-        <div>Nhan dien: <span id="status">dang cho camera...</span></div>
-        <div>Diem: <span id="score">0</span></div>
-      </div>
-
-      <div class="row">
-        <button id="startCameraBtn">Bat camera</button>
-        <select id="cameraSelect" style="display:none; max-width:180px;"></select>
-        <button id="startGameBtn">Bat dau</button>
-        <button id="nextLevelBtn">Man tiep</button>
-        <button id="resetGameBtn" class="danger">Choi lai</button>
-        <button id="backBtn" class="danger">Tro ve</button>
-      </div>
-
-      <div class="row">
-        <button id="freezeBtn">Khoa tuong: TAT</button>
-        <button id="projectionBtn">Trinh chieu (P)</button>
-      </div>
-
-      <div class="row">
-        <span style="font-weight:700;">Man choi:</span>
-        <select id="levelSelect"></select>
-        <span style="font-weight:700; margin-left:10px;">Mau tuong:</span>
-        <select id="colorSelect">
-          <option value="yellow">Vang</option>
-          <option value="pink">Hong</option>
-          <option value="green">Xanh la</option>
-          <option value="blue">Xanh duong</option>
-        </select>
-      </div>
-
-      <div class="row tiny">
-        <div class="slider-group">
-          <div class="slider-label"><span>Tuong toi da:</span><span id="maxObjectsVal">4</span></div>
-          <input id="maxObjectsSlider" type="range" min="1" max="8" value="4" />
-        </div>
-        <div class="slider-group">
-          <div class="slider-label"><span>Do nhay:</span><span id="sensitivityVal">60</span></div>
-          <input id="sensitivitySlider" type="range" min="20" max="95" value="60" />
-        </div>
-        <div class="slider-group">
-          <div class="slider-label"><span>Kich thuoc toi thieu:</span><span id="minSizeVal">35</span></div>
-          <input id="minSizeSlider" type="range" min="10" max="220" value="35" />
-        </div>
-        <div class="slider-group" id="spawnSpeedGroup">
-          <div class="slider-label"><span>Tan suat tha:</span><span id="spawnSpeedVal">45</span></div>
-          <input id="spawnSpeedSlider" type="range" min="12" max="120" value="45" />
-        </div>
-      </div>
-
-      <div id="tip"></div>
-    </div>
-  </div>
-
-  <script type="module">
-    import { GameEngine } from './engine/core.js';
-
-    const launcher = document.getElementById('launcher');
-    const gameView = document.getElementById('gameView');
-    const canvas = document.getElementById('stage');
-
-    let engine = null;
-
-    // --- UI ELEMENTS ---
-    const $ = id => document.getElementById(id);
-    const statusEl = $('status');
-    const scoreEl = $('score');
-    const scoreBig = $('scoreBig');
-    const targetBig = $('targetBig');
-    const timerBig = $('timerBig');
-    const levelTitle = $('levelTitle');
-    const progressBar = $('progressBar');
-    const hudTitle = $('hudTitle');
-    const levelSelect = $('levelSelect');
-    const colorSelect = $('colorSelect');
-    const cameraSelect = $('cameraSelect');
-    const tip = $('tip');
-
-    // Sliders
-    const sliders = {
-      maxObjects: { slider: $('maxObjectsSlider'), val: $('maxObjectsVal') },
-      sensitivity: { slider: $('sensitivitySlider'), val: $('sensitivityVal') },
-      minSize: { slider: $('minSizeSlider'), val: $('minSizeVal') },
-      spawnSpeed: { slider: $('spawnSpeedSlider'), val: $('spawnSpeedVal') },
-    };
-
-    for (const [key, s] of Object.entries(sliders)) {
-      s.slider.oninput = () => {
-        s.val.textContent = s.slider.value;
-        if (engine) {
-          if (key === 'maxObjects') engine.camera.settings.maxObjects = Number(s.slider.value);
-          if (key === 'sensitivity') engine.camera.settings.sensitivity = Number(s.slider.value);
-          if (key === 'minSize') engine.camera.settings.minSize = Number(s.slider.value);
-        }
-      };
+  <script>
+    const stars = document.getElementById('stars');
+    for (let i = 0; i < 80; i++) {
+      const s = document.createElement('span');
+      s.style.left = Math.random() * 100 + '%';
+      s.style.top = Math.random() * 100 + '%';
+      s.style.animationDelay = Math.random() * 3 + 's';
+      s.style.animationDuration = (2 + Math.random() * 3) + 's';
+      stars.appendChild(s);
     }
-
-    colorSelect.onchange = () => {
-      if (engine) engine.camera.settings.color = colorSelect.value;
-    };
-
-    // --- UPDATE HUD ---
-    function updateHUD() {
-      if (!engine || !engine.currentGame) return;
-      const level = engine.getLevel();
-      const remaining = engine.getRemaining();
-      scoreEl.textContent = engine.state.score;
-      scoreBig.textContent = engine.state.score;
-      targetBig.textContent = level.target || 0;
-      timerBig.textContent = `${remaining} giay`;
-      progressBar.style.width = `${Math.min(100, engine.state.score / (level.target || 1) * 100)}%`;
-
-      const objects = engine.camera.getObjects();
-      if (objects.length) {
-        const total = objects.reduce((s, o) => s + o.count, 0);
-        statusEl.textContent = `${objects.length} tuong · ${Math.round(total)} px${engine.camera.frozen ? ' · da khoa' : ''}`;
-      } else {
-        statusEl.textContent = engine.camera.video.readyState >= 2 ? 'khong co vat the' : 'dang cho camera...';
-      }
-    }
-
-    // HUD update loop
-    setInterval(updateHUD, 100);
-
-    // --- CAMERA ---
-    $('startCameraBtn').onclick = async () => {
-      if (!engine) return;
-      engine.audio.init();
-      const ok = await engine.camera.start();
-      if (ok) {
-        // Mount video/mask preview
-        const vp = $('videoPreview');
-        vp.srcObject = engine.camera.stream;
-        const mp = $('maskPreview');
-        const origMask = engine.camera.maskCanvas;
-        const syncMask = () => {
-          if (origMask.width > 0) {
-            mp.width = origMask.width;
-            mp.height = origMask.height;
-            mp.getContext('2d').drawImage(origMask, 0, 0);
-          }
-          requestAnimationFrame(syncMask);
-        };
-        syncMask();
-
-        // List cameras
-        const cameras = await engine.camera.listCameras();
-        if (cameras.length > 1) {
-          cameraSelect.innerHTML = '';
-          cameras.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c.deviceId;
-            opt.textContent = c.label || `Camera ${cameraSelect.length + 1}`;
-            cameraSelect.appendChild(opt);
-          });
-          cameraSelect.style.display = 'inline-block';
-        }
-      }
-    };
-
-    cameraSelect.onchange = () => {
-      if (engine && cameraSelect.value) engine.camera.start(cameraSelect.value);
-    };
-
-    // --- GAME CONTROLS ---
-    $('startGameBtn').onclick = () => { if (engine) engine.startLevel(); };
-    $('nextLevelBtn').onclick = () => { if (engine) engine.nextLevel(); };
-    $('resetGameBtn').onclick = () => { if (engine) engine.resetGame(); };
-
-    $('freezeBtn').onclick = () => {
-      if (!engine) return;
-      engine.camera.toggleFreeze();
-      const btn = $('freezeBtn');
-      btn.textContent = `Khoa tuong: ${engine.camera.frozen ? 'BAT' : 'TAT'}`;
-      btn.classList.toggle('active', engine.camera.frozen);
-    };
-
-    $('projectionBtn').onclick = () => { if (engine) engine.toggleProjection(); };
-
-    $('backBtn').onclick = () => {
-      if (engine) { engine.stop(); engine = null; }
-      gameView.classList.remove('active');
-      launcher.classList.remove('hidden');
-    };
-
-    levelSelect.onchange = () => {
-      if (engine) engine.setLevel(Number(levelSelect.value));
-    };
-
-    // --- KEYBOARD SHORTCUTS ---
-    document.addEventListener('keydown', e => {
-      if (!engine) return;
-      const k = e.key.toLowerCase();
-      if (k === 'p') engine.toggleProjection();
-      if (k === 'f') {
-        engine.camera.toggleFreeze();
-        $('freezeBtn').textContent = `Khoa tuong: ${engine.camera.frozen ? 'BAT' : 'TAT'}`;
-        $('freezeBtn').classList.toggle('active', engine.camera.frozen);
-      }
-      if (k === ' ') { e.preventDefault(); engine.startLevel(); }
-      if (k === 'n') engine.nextLevel();
-      if (k === 'escape') $('backBtn').click();
-      const num = parseInt(k);
-      if (num >= 1 && num <= 9) {
-        levelSelect.value = String(num - 1);
-        engine.setLevel(num - 1);
-      }
-    });
-
-    // --- LAUNCH A GAME ---
-    async function launchGame(gameId) {
-      launcher.classList.add('hidden');
-      gameView.classList.add('active');
-
-      engine = new GameEngine(canvas);
-
-      try {
-        const module = await import(`./games/${gameId}.js`);
-        const game = module.default;
-        await engine.loadGame(game);
-
-        hudTitle.textContent = game.meta.icon + ' ' + game.meta.name;
-        levelTitle.textContent = game.meta.name;
-        tip.innerHTML = game.meta.tip || '';
-
-        // Populate level select
-        levelSelect.innerHTML = '';
-        (game.levels || []).forEach((lv, i) => {
-          const opt = document.createElement('option');
-          opt.value = i;
-          opt.textContent = lv.title || `Man ${i + 1}`;
-          levelSelect.appendChild(opt);
-        });
-
-        // Expose engine helpers the game uses for spawning etc
-        engine._spawnSpeedSlider = sliders.spawnSpeed.slider;
-
-        engine.start();
-        engine.showCenterMessage(game.meta.name, 1200);
-      } catch (err) {
-        console.error('Failed to load game:', err);
-        alert('Khong the tai tro choi: ' + gameId);
-        $('backBtn').click();
-      }
-    }
-
-    // --- GAME CARD CLICKS ---
-    document.querySelectorAll('.game-card').forEach(card => {
-      card.onclick = () => launchGame(card.dataset.game);
-    });
   </script>
 </body>
 </html>
